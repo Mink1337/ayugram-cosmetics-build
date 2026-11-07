@@ -54,12 +54,12 @@ diff --git a/Telegram/build/prepare/prepare.py b/Telegram/build/prepare/prepare.
 diff --git a/Telegram/Resources/langs/lang.strings b/Telegram/Resources/langs/lang.strings
 --- a/Telegram/Resources/langs/lang.strings
 +++ b/Telegram/Resources/langs/lang.strings
-@@ -8878,6 +8878,32 @@
+@@ -8878,6 +8878,57 @@
  "ayu_SupportBoxReceiveBadgeInfo" = "After payment verification, you will receive a unique badge that will be displayed on your profile and visible to other users.";
  "ayu_CrashReporting" = "Crash Reporting";
  "ayu_CrashReportingDescription" = "When this option is enabled, you'll be prompted to send a report after the app crashes. You can decide whether to send it or not.";
 +"ayu_LocalCosmetics" = "Косметика";
-+"ayu_LocalCosmeticsDescription" = "Всё в этом разделе видно только в твоём клиенте, другие пользователи этого не увидят. Бейдж и галочка применятся после перезапуска.";
++"ayu_LocalCosmeticsDescription" = "Всё в этом разделе видно только в твоём клиенте, другие пользователи этого не увидят.";
 +"ayu_LocalBadgeHeader" = "Бейдж у ника";
 +"ayu_LocalBadgeEnable" = "Показывать бейдж";
 +"ayu_LocalBadgeEmoji" = "Выбрать эмодзи";
@@ -77,20 +77,45 @@ diff --git a/Telegram/Resources/langs/lang.strings b/Telegram/Resources/langs/la
 +"ayu_LocalNftPattern" = "Узор";
 +"ayu_LocalNftTitle" = "Название";
 +"ayu_LocalNftNumber" = "Номер";
-+"ayu_LocalNftOwner" = "Имя владельца";
-+"ayu_LocalNftPreview" = "Превью";
 +"ayu_LocalNftLoading" = "Загрузка…";
-+"ayu_LocalNftSaved" = "NFT добавлен в твои подарки.";
++"ayu_LocalNftSaved" = "NFT добавлен в профиль.";
 +"ayu_LocalNftSelectAll" = "Дождись загрузки и выбери все параметры.";
 +"ayu_LocalNftNoAttributes" = "Для этого подарка нет доступных моделей.";
 +"ayu_LocalNftDeleteConfirm" = "Удалить этот NFT?";
++"ayu_LocalNftEdit" = "Изменить NFT";
++"ayu_LocalNftDelete" = "Удалить";
++"ayu_LocalNftUpdated" = "NFT изменён.";
++"ayu_LocalNftRecipient" = "Кому";
++"ayu_LocalNftRecipientSelf" = "Себе";
++"ayu_LocalNftChooseRecipient" = "Кому подарить";
++"ayu_LocalNftPriceStars" = "Цена продажи в звёздах (пусто — не продаётся)";
++"ayu_LocalNftPriceTon" = "Цена продажи в TON (пусто — не продаётся)";
++"ayu_LocalBadgeStyle" = "Вид бейджа";
++"ayu_LocalBadgeStyleSupporter" = "Значок поддержки AyuGram";
++"ayu_LocalBadgeStyleDeveloper" = "Значок разработчика AyuGram";
++"ayu_LocalBadgeStyleEmoji" = "Своё эмодзи";
++"ayu_LocalBalanceHeader" = "Баланс";
++"ayu_LocalStars" = "Звёзды";
++"ayu_LocalTon" = "TON";
++"ayu_LocalBalanceDescription" = "Добавляется к настоящему балансу и видно только тебе. Потратить эти звёзды и TON нельзя.";
++"ayu_LocalUsernames" = "Коллекционные юзернеймы";
++"ayu_LocalUsernamesManage" = "Мои юзернеймы";
++"ayu_LocalUsernamesDescription" = "Юзернеймы появятся в твоём профиле. При нажатии откроется карточка Fragment с твоей ценой и датой покупки.";
++"ayu_LocalUsername" = "Юзернейм";
++"ayu_LocalUsernamePriceTon" = "Цена в TON";
++"ayu_LocalUsernamePriceUsd" = "Цена в долларах";
++"ayu_LocalUsernameDate" = "Дата покупки (ДД.ММ.ГГГГ)";
++"ayu_LocalUsernameAdd" = "Добавить";
++"ayu_LocalUsernameAdded" = "Юзернейм добавлен в профиль.";
++"ayu_LocalUsernameInvalid" = "Юзернейм: латинские буквы, цифры и _, от 4 до 32 символов, начинается с буквы.";
++"ayu_LocalUsernameDeleteConfirm" = "Удалить этот юзернейм?";
  "ayu_ResetSettings" = "Reset Settings";
  "ayu_ResetSettingsConfirmation" = "Are you sure you want to reset **all** AyuGram preferences to their defaults?";
  "ayu_DisableColorfulCover" = "Disable adaptive color";
 diff --git a/Telegram/SourceFiles/ayu/ayu_settings.cpp b/Telegram/SourceFiles/ayu/ayu_settings.cpp
 --- a/Telegram/SourceFiles/ayu/ayu_settings.cpp
 +++ b/Telegram/SourceFiles/ayu/ayu_settings.cpp
-@@ -1039,6 +1039,42 @@
+@@ -1039,6 +1039,66 @@
  void AyuSettings::setImproveLinkPreviews(bool val) {
  	if (_improveLinkPreviews.current() == val) return;
  	_improveLinkPreviews = val;
@@ -130,10 +155,34 @@ diff --git a/Telegram/SourceFiles/ayu/ayu_settings.cpp b/Telegram/SourceFiles/ay
 +void AyuSettings::setLocalGifts(const QString &val) {
 +	if (_localGifts.current() == val) return;
 +	_localGifts = val;
++	save();
++}
++
++void AyuSettings::setLocalBadgeStyle(int val) {
++	if (_localBadgeStyle.current() == val) return;
++	_localBadgeStyle = val;
++	save();
++}
++
++void AyuSettings::setLocalStars(int64 val) {
++	if (_localStars.current() == val) return;
++	_localStars = val;
++	save();
++}
++
++void AyuSettings::setLocalTon(const QString &val) {
++	if (_localTon.current() == val) return;
++	_localTon = val;
++	save();
++}
++
++void AyuSettings::setLocalUsernames(const QString &val) {
++	if (_localUsernames.current() == val) return;
++	_localUsernames = val;
  	save();
  }
  
-@@ -1165,6 +1201,12 @@
+@@ -1165,6 +1225,16 @@
  		{"avatarCorners", s._avatarCorners.current()},
  		{"singleCornerRadius", s._singleCornerRadius.current()},
  		{"streamerMode", s._streamerMode.current()},
@@ -143,10 +192,14 @@ diff --git a/Telegram/SourceFiles/ayu/ayu_settings.cpp b/Telegram/SourceFiles/ay
 +		{"localVerified", s._localVerified.current()},
 +		{"localRatingLevel", s._localRatingLevel.current()},
 +		{"localGifts", s._localGifts.current()},
++		{"localBadgeStyle", s._localBadgeStyle.current()},
++		{"localStars", s._localStars.current()},
++		{"localTon", s._localTon.current()},
++		{"localUsernames", s._localUsernames.current()},
  		{"messageShotSettings", s._messageShotSettings}
  	};
  }
-@@ -1269,6 +1311,12 @@
+@@ -1269,6 +1339,16 @@
  	s._avatarCorners = j.value("avatarCorners", defaults._avatarCorners.current());
  	s._singleCornerRadius = j.value("singleCornerRadius", defaults._singleCornerRadius.current());
  	s._streamerMode = j.value("streamerMode", defaults._streamerMode.current());
@@ -156,13 +209,17 @@ diff --git a/Telegram/SourceFiles/ayu/ayu_settings.cpp b/Telegram/SourceFiles/ay
 +	s._localVerified = j.value("localVerified", defaults._localVerified.current());
 +	s._localRatingLevel = j.value("localRatingLevel", defaults._localRatingLevel.current());
 +	s._localGifts = j.value("localGifts", defaults._localGifts.current());
++	s._localBadgeStyle = j.value("localBadgeStyle", defaults._localBadgeStyle.current());
++	s._localStars = j.value("localStars", defaults._localStars.current());
++	s._localTon = j.value("localTon", defaults._localTon.current());
++	s._localUsernames = j.value("localUsernames", defaults._localUsernames.current());
  
  	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {
  		j["messageShotSettings"].get_to(s._messageShotSettings);
 diff --git a/Telegram/SourceFiles/ayu/ayu_settings.h b/Telegram/SourceFiles/ayu/ayu_settings.h
 --- a/Telegram/SourceFiles/ayu/ayu_settings.h
 +++ b/Telegram/SourceFiles/ayu/ayu_settings.h
-@@ -353,6 +353,22 @@
+@@ -353,6 +353,42 @@
  	[[nodiscard]] int avatarCorners() const { return _avatarCorners.current(); }
  	[[nodiscard]] bool singleCornerRadius() const { return _singleCornerRadius.current(); }
  	[[nodiscard]] bool streamerMode() const { return _streamerMode.current(); }
@@ -172,6 +229,10 @@ diff --git a/Telegram/SourceFiles/ayu/ayu_settings.h b/Telegram/SourceFiles/ayu/
 +	[[nodiscard]] bool localVerified() const { return _localVerified.current(); }
 +	[[nodiscard]] int localRatingLevel() const { return _localRatingLevel.current(); }
 +	[[nodiscard]] const QString &localGifts() const { return _localGifts.current(); }
++	[[nodiscard]] int localBadgeStyle() const { return _localBadgeStyle.current(); }
++	[[nodiscard]] int64 localStars() const { return _localStars.current(); }
++	[[nodiscard]] const QString &localTon() const { return _localTon.current(); }
++	[[nodiscard]] const QString &localUsernames() const { return _localUsernames.current(); }
 +
 +	void setLocalBadgeEnabled(bool val);
 +	void setLocalBadgeEmojiId(uint64 val);
@@ -179,13 +240,29 @@ diff --git a/Telegram/SourceFiles/ayu/ayu_settings.h b/Telegram/SourceFiles/ayu/
 +	void setLocalVerified(bool val);
 +	void setLocalRatingLevel(int val);
 +	void setLocalGifts(const QString &val);
++	void setLocalBadgeStyle(int val);
++	void setLocalStars(int64 val);
++	void setLocalTon(const QString &val);
++	void setLocalUsernames(const QString &val);
 +
 +	[[nodiscard]] rpl::producer<QString> localBadgeTextValue() const { return _localBadgeText.value(); }
 +	[[nodiscard]] rpl::producer<int> localRatingLevelValue() const { return _localRatingLevel.value(); }
++	[[nodiscard]] rpl::producer<bool> localVerifiedValue() const { return _localVerified.value(); }
++	[[nodiscard]] rpl::producer<int> localBadgeStyleValue() const { return _localBadgeStyle.value(); }
++	[[nodiscard]] rpl::producer<int64> localStarsValue() const { return _localStars.value(); }
++	[[nodiscard]] rpl::producer<QString> localTonValue() const { return _localTon.value(); }
++	[[nodiscard]] rpl::producer<QString> localUsernamesValue() const { return _localUsernames.value(); }
++	[[nodiscard]] rpl::producer<QString> localGiftsChanges() const { return _localGifts.changes(); }
++	[[nodiscard]] rpl::producer<> localBadgeChanges() const {
++		return rpl::merge(
++			_localBadgeEnabled.changes() | rpl::to_empty,
++			_localBadgeEmojiId.changes() | rpl::to_empty,
++			_localBadgeStyle.changes() | rpl::to_empty);
++	}
  
  	void setSaveDeletedMessages(bool val);
  	void setSaveMessagesHistory(bool val);
-@@ -711,6 +727,12 @@
+@@ -711,6 +747,16 @@
  	rpl::variable<int> _avatarCorners = 23;
  	rpl::variable<bool> _singleCornerRadius = false;
  	rpl::variable<bool> _streamerMode = false;
@@ -195,6 +272,10 @@ diff --git a/Telegram/SourceFiles/ayu/ayu_settings.h b/Telegram/SourceFiles/ayu/
 +	rpl::variable<bool> _localVerified = false;
 +	rpl::variable<int> _localRatingLevel = 0;
 +	rpl::variable<QString> _localGifts;
++	rpl::variable<int> _localBadgeStyle = 0;
++	rpl::variable<int64> _localStars = 0;
++	rpl::variable<QString> _localTon;
++	rpl::variable<QString> _localUsernames;
  
  	rpl::variable<bool> _useGlobalGhostMode = true;
  	std::map<uint64, std::unique_ptr<GhostModeAccountSettings>> _ghostAccounts;
@@ -202,7 +283,7 @@ diff --git a/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.c
 new file mode 100644
 --- /dev/null
 +++ b/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.cpp
-@@ -0,0 +1,254 @@
+@@ -0,0 +1,507 @@
 +// This is the source code of AyuGram for Desktop.
 +//
 +// We do not and cannot prevent the use of our code,
@@ -215,6 +296,8 @@ new file mode 100644
 +#include "apiwrap.h"
 +#include "ayu/ayu_settings.h"
 +#include "core/application.h"
++#include "data/components/credits.h"
++#include "data/data_peer.h"
 +#include "data/data_session.h"
 +#include "main/main_account.h"
 +#include "main/main_domain.h"
@@ -229,6 +312,40 @@ new file mode 100644
 +
 +constexpr auto kLocalIdBase = uint64(0x7A79000000000000ULL);
 +constexpr auto kLocalIdMask = uint64(0xFFFF000000000000ULL);
++constexpr auto kNanosInOne = int64(1'000'000'000);
++constexpr auto kNanoDigits = 9;
++
++struct CatalogRequest {
++	Fn<void(std::vector<Data::StarGift>)> done;
++	Fn<void(QString)> fail;
++};
++
++struct AttributesRequest {
++	Fn<void(Data::UniqueGiftAttributes)> done;
++	Fn<void(QString)> fail;
++};
++
++struct SessionCache {
++	std::optional<std::vector<Data::StarGift>> catalog;
++	std::vector<CatalogRequest> catalogWaiters;
++	base::flat_map<uint64, Data::UniqueGiftAttributes> attributes;
++	base::flat_map<uint64, std::vector<AttributesRequest>> attributeWaiters;
++};
++
++base::flat_map<not_null<Main::Session*>, std::unique_ptr<SessionCache>> Caches;
++
++[[nodiscard]] SessionCache &CacheFor(not_null<Main::Session*> session) {
++	const auto i = Caches.find(session);
++	if (i != end(Caches)) {
++		return *i->second;
++	}
++	session->lifetime().add([=] {
++		Caches.remove(session);
++	});
++	return *Caches.emplace(
++		session,
++		std::make_unique<SessionCache>()).first->second;
++}
 +
 +template <typename Attribute>
 +[[nodiscard]] const Attribute *FindByName(
@@ -242,7 +359,37 @@ new file mode 100644
 +	return nullptr;
 +}
 +
++[[nodiscard]] bool BelongsTo(
++		const LocalGift &gift,
++		not_null<const PeerData*> peer) {
++	return gift.peerId
++		? (PeerId(gift.peerId) == peer->id)
++		: peer->isSelf();
++}
++
++[[nodiscard]] QJsonArray ReadArray(const QString &json) {
++	return QJsonDocument::fromJson(json.toUtf8()).array();
++}
++
++[[nodiscard]] QString WriteArray(const QJsonArray &array) {
++	return QString::fromUtf8(
++		QJsonDocument(array).toJson(QJsonDocument::Compact));
++}
++
++[[nodiscard]] int64 ReadInt64(const QJsonObject &object, const QString &key) {
++	return object.value(key).toString().toLongLong();
++}
++
 +} // namespace
++
++BadgeStyle LocalBadgeStyle() {
++	const auto value = AyuSettings::getInstance().localBadgeStyle();
++	return (value == int(BadgeStyle::Developer))
++		? BadgeStyle::Developer
++		: (value == int(BadgeStyle::Emoji))
++		? BadgeStyle::Emoji
++		: BadgeStyle::Supporter;
++}
 +
 +bool IsLocalBadgePeer(int64 bareId) {
 +	if (!AyuSettings::getInstance().localBadgeEnabled()) {
@@ -261,11 +408,14 @@ new file mode 100644
 +	return (id & kLocalIdMask) == kLocalIdBase;
 +}
 +
++int LocalGiftIndex(uint64 id) {
++	return IsLocalGiftId(id) ? int(id - kLocalIdBase - 1) : -1;
++}
++
 +std::vector<LocalGift> LoadGifts() {
-+	const auto document = QJsonDocument::fromJson(
-+		AyuSettings::getInstance().localGifts().toUtf8());
 +	auto result = std::vector<LocalGift>();
-+	for (const auto &value : document.array()) {
++	for (const auto &value : ReadArray(
++			AyuSettings::getInstance().localGifts())) {
 +		const auto object = value.toObject();
 +		result.push_back({
 +			.giftId = object.value(u"giftId"_q).toString().toULongLong(),
@@ -273,9 +423,11 @@ new file mode 100644
 +			.modelName = object.value(u"model"_q).toString(),
 +			.backdropName = object.value(u"backdrop"_q).toString(),
 +			.patternName = object.value(u"pattern"_q).toString(),
-+			.ownerName = object.value(u"owner"_q).toString(),
++			.peerId = object.value(u"peer"_q).toString().toULongLong(),
 +			.number = object.value(u"number"_q).toInt(1),
 +			.date = TimeId(object.value(u"date"_q).toInt()),
++			.resaleStars = ReadInt64(object, u"stars"_q),
++			.resaleNanoTon = ReadInt64(object, u"ton"_q),
 +		});
 +	}
 +	return result;
@@ -290,20 +442,37 @@ new file mode 100644
 +		object.insert(u"model"_q, gift.modelName);
 +		object.insert(u"backdrop"_q, gift.backdropName);
 +		object.insert(u"pattern"_q, gift.patternName);
-+		object.insert(u"owner"_q, gift.ownerName);
++		object.insert(u"peer"_q, QString::number(gift.peerId));
 +		object.insert(u"number"_q, gift.number);
 +		object.insert(u"date"_q, int(gift.date));
++		object.insert(u"stars"_q, QString::number(gift.resaleStars));
++		object.insert(u"ton"_q, QString::number(gift.resaleNanoTon));
 +		array.push_back(object);
 +	}
-+	AyuSettings::getInstance().setLocalGifts(QString::fromUtf8(
-+		QJsonDocument(array).toJson(QJsonDocument::Compact)));
++	AyuSettings::getInstance().setLocalGifts(WriteArray(array));
 +}
 +
 +int GiftsCount() {
 +	return int(LoadGifts().size());
 +}
 +
++int GiftsCountFor(not_null<const PeerData*> peer) {
++	if (AyuSettings::getInstance().localGifts().isEmpty()) {
++		return 0;
++	}
++	return int(ranges::count_if(LoadGifts(), [&](const LocalGift &gift) {
++		return BelongsTo(gift, peer);
++	}));
++}
++
++PeerId GiftOwnerId(
++		not_null<Main::Session*> session,
++		const LocalGift &gift) {
++	return gift.peerId ? PeerId(gift.peerId) : session->userPeerId();
++}
++
 +Data::SavedStarGift BuildSavedGift(
++		not_null<Main::Session*> session,
 +		const Data::StarGift &base,
 +		const Data::UniqueGiftModel &model,
 +		const Data::UniqueGiftPattern &pattern,
@@ -311,8 +480,10 @@ new file mode 100644
 +		const LocalGift &gift,
 +		int index) {
 +	const auto id = kLocalIdBase + uint64(index) + 1;
-+	// WHY: no owner id, slug or manage id, so the gift view stays read-only
-+	// and never offers transfer, sale or wear actions the server would reject.
++	const auto tonOnly = (gift.resaleNanoTon > 0) && (gift.resaleStars <= 0);
++	// WHY: the gift view treats a gift as buyable only when it is listed and
++	// owned by someone else; sale, wear and transfer need a manage id, which
++	// a local gift never has, so with the owner set the view stays read-only.
 +	return Data::SavedStarGift{
 +		.info = Data::StarGift{
 +			.id = id,
@@ -320,15 +491,20 @@ new file mode 100644
 +				.id = id,
 +				.initialGiftId = gift.giftId,
 +				.title = gift.title,
-+				.ownerName = gift.ownerName,
++				.ownerId = GiftOwnerId(session, gift),
++				.nanoTonForResale = std::max(gift.resaleNanoTon, int64(0)),
++				.starsForResale = int(tonOnly
++					? std::max(gift.resaleNanoTon / (kNanosInOne / 100), int64(1))
++					: std::max(gift.resaleStars, int64(0))),
 +				.number = gift.number,
++				.onlyAcceptTon = tonOnly,
 +				.model = model,
 +				.pattern = pattern,
 +				.backdrop = backdrop,
 +			}),
 +			.document = model.document,
 +			.limitedLeft = base.limitedLeft,
-+			.limitedCount = base.limitedCount,
++			.limitedCount = std::max(base.limitedCount, gift.number),
 +		},
 +		.date = gift.date,
 +	};
@@ -338,6 +514,15 @@ new file mode 100644
 +		not_null<Main::Session*> session,
 +		Fn<void(std::vector<Data::StarGift>)> done,
 +		Fn<void(QString)> fail) {
++	auto &cache = CacheFor(session);
++	if (cache.catalog) {
++		done(*cache.catalog);
++		return;
++	}
++	cache.catalogWaiters.push_back({ std::move(done), std::move(fail) });
++	if (cache.catalogWaiters.size() > 1) {
++		return;
++	}
 +	session->api().request(MTPpayments_GetStarGifts(
 +		MTP_int(0)
 +	)).done([=](const MTPpayments_StarGifts &result) {
@@ -352,9 +537,16 @@ new file mode 100644
 +			}
 +		}, [](const MTPDpayments_starGiftsNotModified &) {
 +		});
-+		done(std::move(gifts));
++		auto &cache = CacheFor(session);
++		cache.catalog = std::move(gifts);
++		for (const auto &waiter : base::take(cache.catalogWaiters)) {
++			waiter.done(*cache.catalog);
++		}
 +	}).fail([=](const MTP::Error &error) {
-+		fail(error.type());
++		for (const auto &waiter : base::take(
++				CacheFor(session).catalogWaiters)) {
++			waiter.fail(error.type());
++		}
 +	}).send();
 +}
 +
@@ -363,6 +555,17 @@ new file mode 100644
 +		uint64 giftId,
 +		Fn<void(Data::UniqueGiftAttributes)> done,
 +		Fn<void(QString)> fail) {
++	auto &cache = CacheFor(session);
++	if (const auto i = cache.attributes.find(giftId)
++		; i != end(cache.attributes)) {
++		done(i->second);
++		return;
++	}
++	auto &waiters = cache.attributeWaiters[giftId];
++	waiters.push_back({ std::move(done), std::move(fail) });
++	if (waiters.size() > 1) {
++		return;
++	}
 +	session->api().request(MTPpayments_GetStarGiftUpgradeAttributes(
 +		MTP_long(giftId)
 +	)).done([=](const MTPpayments_StarGiftUpgradeAttributes &result) {
@@ -377,16 +580,35 @@ new file mode 100644
 +			}, [](const auto &) {
 +			});
 +		}
-+		done(std::move(attributes));
++		auto &cache = CacheFor(session);
++		// A copy, a callback may insert into the map and move its storage.
++		const auto stored = cache.attributes[giftId] = std::move(attributes);
++		const auto list = base::take(cache.attributeWaiters[giftId]);
++		cache.attributeWaiters.remove(giftId);
++		for (const auto &waiter : list) {
++			waiter.done(stored);
++		}
 +	}).fail([=](const MTP::Error &error) {
-+		fail(error.type());
++		auto &cache = CacheFor(session);
++		const auto list = base::take(cache.attributeWaiters[giftId]);
++		cache.attributeWaiters.remove(giftId);
++		for (const auto &waiter : list) {
++			waiter.fail(error.type());
++		}
 +	}).send();
 +}
 +
 +void ResolveGifts(
-+		not_null<Main::Session*> session,
++		not_null<PeerData*> peer,
 +		Fn<void(std::vector<Data::SavedStarGift>)> done) {
-+	const auto gifts = LoadGifts();
++	const auto session = &peer->session();
++	auto all = LoadGifts();
++	auto gifts = std::vector<std::pair<int, LocalGift>>();
++	for (auto i = 0; i != int(all.size()); ++i) {
++		if (BelongsTo(all[i], peer.get())) {
++			gifts.emplace_back(i, std::move(all[i]));
++		}
++	}
 +	if (gifts.empty()) {
 +		done({});
 +		return;
@@ -401,7 +623,7 @@ new file mode 100644
 +		state->catalog = std::move(catalog);
 +
 +		auto ids = base::flat_set<uint64>();
-+		for (const auto &gift : gifts) {
++		for (const auto &[index, gift] : gifts) {
 +			ids.emplace(gift.giftId);
 +		}
 +		state->pending = int(ids.size());
@@ -411,8 +633,7 @@ new file mode 100644
 +				return;
 +			}
 +			auto result = std::vector<Data::SavedStarGift>();
-+			for (auto i = 0; i != int(gifts.size()); ++i) {
-+				const auto &gift = gifts[i];
++			for (const auto &[index, gift] : gifts) {
 +				const auto base = ranges::find(
 +					state->catalog,
 +					gift.giftId,
@@ -432,12 +653,13 @@ new file mode 100644
 +					gift.backdropName);
 +				if (model && pattern && backdrop) {
 +					result.push_back(BuildSavedGift(
++						session,
 +						*base,
 +						*model,
 +						*pattern,
 +						*backdrop,
 +						gift,
-+						i));
++						index));
 +				}
 +			}
 +			done(std::move(result));
@@ -456,12 +678,124 @@ new file mode 100644
 +	});
 +}
 +
++void PreloadGifts(not_null<PeerData*> peer) {
++	ResolveGifts(peer, [](std::vector<Data::SavedStarGift>) {});
++}
++
++std::vector<LocalUsername> LoadUsernames() {
++	auto result = std::vector<LocalUsername>();
++	for (const auto &value : ReadArray(
++			AyuSettings::getInstance().localUsernames())) {
++		const auto object = value.toObject();
++		const auto username = object.value(u"username"_q).toString();
++		if (username.isEmpty()) {
++			continue;
++		}
++		result.push_back({
++			.username = username,
++			.nanoTon = ReadInt64(object, u"ton"_q),
++			.usdCents = ReadInt64(object, u"usd"_q),
++			.date = TimeId(object.value(u"date"_q).toInt()),
++		});
++	}
++	return result;
++}
++
++void SaveUsernames(const std::vector<LocalUsername> &usernames) {
++	auto array = QJsonArray();
++	for (const auto &entry : usernames) {
++		auto object = QJsonObject();
++		object.insert(u"username"_q, entry.username);
++		object.insert(u"ton"_q, QString::number(entry.nanoTon));
++		object.insert(u"usd"_q, QString::number(entry.usdCents));
++		object.insert(u"date"_q, int(entry.date));
++		array.push_back(object);
++	}
++	AyuSettings::getInstance().setLocalUsernames(WriteArray(array));
++}
++
++std::optional<LocalUsername> FindUsername(const QString &username) {
++	const auto clean = username.startsWith('@')
++		? username.mid(1)
++		: username;
++	for (const auto &entry : LoadUsernames()) {
++		if (!entry.username.compare(clean, Qt::CaseInsensitive)) {
++			return entry;
++		}
++	}
++	return std::nullopt;
++}
++
++int64 ParseNanoTon(QString text) {
++	text = text.trimmed().replace(',', '.');
++	if (text.isEmpty()) {
++		return 0;
++	}
++	const auto dot = text.indexOf('.');
++	const auto wholePart = (dot < 0) ? text : text.mid(0, dot);
++	auto fractionPart = (dot < 0) ? QString() : text.mid(dot + 1);
++	auto ok = true;
++	const auto whole = wholePart.isEmpty() ? 0LL : wholePart.toLongLong(&ok);
++	if (!ok || whole < 0 || whole > 1'000'000'000LL) {
++		return 0;
++	}
++	fractionPart = fractionPart.left(kNanoDigits);
++	while (fractionPart.size() < kNanoDigits) {
++		fractionPart.append('0');
++	}
++	const auto fraction = fractionPart.toLongLong(&ok);
++	if (!ok || fraction < 0) {
++		return 0;
++	}
++	return whole * kNanosInOne + fraction;
++}
++
++QString FormatNanoTon(int64 nanoTon) {
++	if (nanoTon <= 0) {
++		return QString();
++	}
++	auto result = QString::number(nanoTon / kNanosInOne);
++	if (const auto fraction = nanoTon % kNanosInOne) {
++		auto digits = QString::number(fraction).rightJustified(
++			kNanoDigits,
++			'0');
++		while (digits.endsWith('0')) {
++			digits.chop(1);
++		}
++		result += '.' + digits;
++	}
++	return result;
++}
++
++CreditsAmount LocalStarsAmount() {
++	return CreditsAmount(
++		std::max(AyuSettings::getInstance().localStars(), int64(0)));
++}
++
++CreditsAmount LocalTonAmount() {
++	const auto nano = ParseNanoTon(AyuSettings::getInstance().localTon());
++	return CreditsAmount(
++		nano / kNanosInOne,
++		nano % kNanosInOne,
++		CreditsType::Ton);
++}
++
++void RefreshBalances() {
++	for (const auto &entry : Core::App().domain().accounts()) {
++		if (entry.account->sessionExists()) {
++			auto &credits = entry.account->session().credits();
++			credits.load(true);
++			credits.tonLoad(true);
++		}
++	}
++}
++
 +} // namespace AyuCosmetics
 diff --git a/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.h b/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.h
 new file mode 100644
 --- /dev/null
 +++ b/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.h
-@@ -0,0 +1,56 @@
+@@ -0,0 +1,93 @@
 +// This is the source code of AyuGram for Desktop.
 +//
 +// We do not and cannot prevent the use of our code,
@@ -478,25 +812,48 @@ new file mode 100644
 +
 +namespace AyuCosmetics {
 +
++enum class BadgeStyle {
++	Supporter = 0,
++	Developer = 1,
++	Emoji = 2,
++};
++
 +struct LocalGift {
 +	uint64 giftId = 0;
 +	QString title;
 +	QString modelName;
 +	QString backdropName;
 +	QString patternName;
-+	QString ownerName;
++	// Raw PeerId value of the recipient, zero means the account itself.
++	uint64 peerId = 0;
 +	int number = 1;
++	TimeId date = 0;
++	int64 resaleStars = 0;
++	int64 resaleNanoTon = 0;
++};
++
++struct LocalUsername {
++	QString username;
++	int64 nanoTon = 0;
++	int64 usdCents = 0;
 +	TimeId date = 0;
 +};
 +
++[[nodiscard]] BadgeStyle LocalBadgeStyle();
 +[[nodiscard]] bool IsLocalBadgePeer(int64 bareId);
 +[[nodiscard]] bool IsLocalGiftId(uint64 id);
++[[nodiscard]] int LocalGiftIndex(uint64 id);
 +
 +[[nodiscard]] std::vector<LocalGift> LoadGifts();
 +void SaveGifts(const std::vector<LocalGift> &gifts);
 +[[nodiscard]] int GiftsCount();
++[[nodiscard]] int GiftsCountFor(not_null<const PeerData*> peer);
++[[nodiscard]] PeerId GiftOwnerId(
++	not_null<Main::Session*> session,
++	const LocalGift &gift);
 +
 +[[nodiscard]] Data::SavedStarGift BuildSavedGift(
++	not_null<Main::Session*> session,
 +	const Data::StarGift &base,
 +	const Data::UniqueGiftModel &model,
 +	const Data::UniqueGiftPattern &pattern,
@@ -504,6 +861,7 @@ new file mode 100644
 +	const LocalGift &gift,
 +	int index);
 +
++// Both are cached per session, so repeated calls answer synchronously.
 +void RequestCatalog(
 +	not_null<Main::Session*> session,
 +	Fn<void(std::vector<Data::StarGift>)> done,
@@ -513,16 +871,29 @@ new file mode 100644
 +	uint64 giftId,
 +	Fn<void(Data::UniqueGiftAttributes)> done,
 +	Fn<void(QString)> fail);
++
 +void ResolveGifts(
-+	not_null<Main::Session*> session,
++	not_null<PeerData*> peer,
 +	Fn<void(std::vector<Data::SavedStarGift>)> done);
++void PreloadGifts(not_null<PeerData*> peer);
++
++[[nodiscard]] std::vector<LocalUsername> LoadUsernames();
++void SaveUsernames(const std::vector<LocalUsername> &usernames);
++[[nodiscard]] std::optional<LocalUsername> FindUsername(
++	const QString &username);
++
++[[nodiscard]] int64 ParseNanoTon(QString text);
++[[nodiscard]] QString FormatNanoTon(int64 nanoTon);
++[[nodiscard]] CreditsAmount LocalStarsAmount();
++[[nodiscard]] CreditsAmount LocalTonAmount();
++void RefreshBalances();
 +
 +} // namespace AyuCosmetics
 diff --git a/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.cpp b/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.cpp
 new file mode 100644
 --- /dev/null
 +++ b/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.cpp
-@@ -0,0 +1,340 @@
+@@ -0,0 +1,756 @@
 +// This is the source code of AyuGram for Desktop.
 +//
 +// We do not and cannot prevent the use of our code,
@@ -533,61 +904,71 @@ new file mode 100644
 +
 +#include "ayu/features/local_cosmetics/local_cosmetics.h"
 +#include "base/unixtime.h"
++#include "boxes/peer_list_box.h"
++#include "boxes/peer_list_controllers.h"
++#include "boxes/star_gift_cover_box.h"
++#include "boxes/star_gift_preview_box.h"
 +#include "data/data_changes.h"
 +#include "data/data_document.h"
++#include "data/data_peer.h"
++#include "data/data_session.h"
++#include "data/data_thread.h"
 +#include "data/data_user.h"
++#include "info/peer_gifts/info_peer_gifts_common.h"
 +#include "lang/lang_text_entity.h"
 +#include "lang_auto.h"
 +#include "main/main_session.h"
 +#include "settings/settings_common.h"
 +#include "settings/settings_credits_graphics.h"
++#include "styles/style_credits.h"
++#include "styles/style_layers.h"
++#include "styles/style_menu_icons.h"
 +#include "styles/style_settings.h"
 +#include "styles/style_widgets.h"
 +#include "ui/boxes/confirm_box.h"
 +#include "ui/layers/generic_box.h"
++#include "ui/vertical_list.h"
 +#include "ui/widgets/buttons.h"
 +#include "ui/widgets/fields/input_field.h"
++#include "ui/widgets/popup_menu.h"
 +#include "ui/wrap/vertical_layout.h"
 +#include "window/window_session_controller.h"
++
++#include <QtCore/QDateTime>
++#include <QtCore/QRegularExpression>
++
++#include <cmath>
 +
 +namespace AyuCosmetics {
 +namespace {
 +
-+constexpr auto kMaxNumber = 9999999;
++constexpr auto kMaxNumber = 99999999;
++constexpr auto kMaxStars = int64(1'000'000'000);
++constexpr auto kNanosInOne = int64(1'000'000'000);
++constexpr auto kDateFormat = "dd.MM.yyyy";
 +
-+struct State {
++using Info::PeerGifts::GiftButton;
++using Info::PeerGifts::GiftButtonMode;
++using Info::PeerGifts::GiftTypeStars;
++
++struct ConstructorState {
 +	std::vector<Data::StarGift> catalog;
 +	Data::UniqueGiftAttributes attributes;
 +	int gift = -1;
 +	int model = -1;
 +	int backdrop = -1;
 +	int pattern = -1;
++	PeerData *recipient = nullptr;
++	std::optional<LocalGift> initial;
 +	rpl::variable<QString> giftLabel;
 +	rpl::variable<QString> modelLabel;
 +	rpl::variable<QString> backdropLabel;
 +	rpl::variable<QString> patternLabel;
++	rpl::variable<QString> recipientLabel;
++	rpl::variable<QString> numberText;
++	rpl::variable<CreditsAmount> resale;
++	std::unique_ptr<rpl::variable<Ui::UniqueGiftCover>> cover;
 +};
-+
-+void ChooseOptionBox(
-+		not_null<Ui::GenericBox*> box,
-+		QString title,
-+		std::vector<QString> labels,
-+		Fn<void(int)> chosen) {
-+	box->setTitle(rpl::single(title));
-+	for (auto i = 0; i != int(labels.size()); ++i) {
-+		const auto button = Settings::AddButtonWithIcon(
-+			box->verticalLayout(),
-+			rpl::single(labels[i]),
-+			st::settingsButtonNoIcon);
-+		button->setClickedCallback([=] {
-+			chosen(i);
-+			box->closeBox();
-+		});
-+	}
-+	box->addButton(tr::lng_cancel(), [=] {
-+		box->closeBox();
-+	});
-+}
 +
 +[[nodiscard]] QString GiftTitle(const Data::StarGift &gift) {
 +	if (!gift.resellTitle.isEmpty()) {
@@ -597,89 +978,346 @@ new file mode 100644
 +	return sticker ? sticker->alt : QString::number(gift.id);
 +}
 +
-+template <typename Attribute>
-+[[nodiscard]] std::vector<QString> AttributeLabels(
-+		const std::vector<Attribute> &list) {
-+	auto result = std::vector<QString>();
-+	result.reserve(list.size());
-+	for (const auto &attribute : list) {
-+		result.push_back(attribute.name
-+			+ u" · "_q
-+			+ Data::UniqueGiftAttributeText(attribute));
-+	}
-+	return result;
++[[nodiscard]] QString AttributeLabel(const Data::UniqueGiftAttribute &value) {
++	return value.name + u" · "_q + Data::UniqueGiftAttributeText(value);
 +}
 +
-+void NotifyGiftsChanged(not_null<Window::SessionController*> controller) {
++template <typename Attribute>
++[[nodiscard]] int FindIndex(
++		const std::vector<Attribute> &list,
++		const QString &name) {
++	for (auto i = 0; i != int(list.size()); ++i) {
++		if (list[i].name == name) {
++			return i;
++		}
++	}
++	return list.empty() ? -1 : 0;
++}
++
++template <typename Attribute>
++[[nodiscard]] int FindIndexById(
++		const std::vector<Attribute> &list,
++		const Attribute &value) {
++	for (auto i = 0; i != int(list.size()); ++i) {
++		if (Data::IdFor(list[i]) == Data::IdFor(value)) {
++			return i;
++		}
++	}
++	return -1;
++}
++
++[[nodiscard]] CreditsAmount ResaleAmount(int64 stars, int64 nanoTon) {
++	if (stars > 0) {
++		return CreditsAmount(stars);
++	} else if (nanoTon > 0) {
++		return CreditsAmount(
++			nanoTon / kNanosInOne,
++			nanoTon % kNanosInOne,
++			CreditsType::Ton);
++	}
++	return CreditsAmount();
++}
++
++[[nodiscard]] int64 ParseStars(const QString &text) {
++	return std::clamp(text.trimmed().toLongLong(), int64(0), kMaxStars);
++}
++
++[[nodiscard]] int ParseNumber(const QString &text) {
++	return std::clamp(text.trimmed().toInt(), 1, kMaxNumber);
++}
++
++[[nodiscard]] QString RecipientName(PeerData *recipient) {
++	return (!recipient || recipient->isSelf())
++		? tr::ayu_LocalNftRecipientSelf(tr::now)
++		: recipient->name();
++}
++
++void NotifyGiftsChanged(
++		not_null<Window::SessionController*> controller,
++		PeerId ownerId) {
 +	const auto session = &controller->session();
 +	session->changes().peerUpdated(
 +		session->user(),
 +		Data::PeerUpdate::Flag::PeerGifts);
++	if (ownerId && ownerId != session->userPeerId()) {
++		session->changes().peerUpdated(
++			session->data().peer(ownerId),
++			Data::PeerUpdate::Flag::PeerGifts);
++	}
++}
++
++not_null<Ui::InputField*> AddField(
++		not_null<Ui::GenericBox*> box,
++		rpl::producer<QString> placeholder,
++		const QString &value) {
++	return box->addRow(object_ptr<Ui::InputField>(
++		box->verticalLayout(),
++		st::defaultInputField,
++		std::move(placeholder),
++		value));
++}
++
++void GiftPickerBox(
++		not_null<Ui::GenericBox*> box,
++		not_null<Window::SessionController*> controller,
++		std::vector<Data::StarGift> catalog,
++		int selected,
++		Fn<void(int)> chosen) {
++	struct State {
++		explicit State(not_null<Main::Session*> session)
++		: delegate(session, GiftButtonMode::Minimal) {
++		}
++
++		Info::PeerGifts::Delegate delegate;
++		std::vector<not_null<GiftButton*>> buttons;
++	};
++	const auto state = box->lifetime().make_state<State>(
++		&controller->session());
++
++	box->setTitle(tr::ayu_LocalNftGift());
++	box->setWidth(st::boxWideWidth);
++
++	const auto gifts = box->addRow(
++		object_ptr<Ui::RpWidget>(box),
++		QMargins(
++			st::giftBoxPadding.left(),
++			st::giftBoxPadding.top(),
++			st::giftBoxPadding.right(),
++			st::giftBoxPadding.bottom()));
++	for (auto i = 0; i != int(catalog.size()); ++i) {
++		state->buttons.push_back(
++			Ui::CreateChild<GiftButton>(gifts, &state->delegate));
++		const auto button = state->buttons.back();
++		button->setDescriptor(GiftTypeStars{
++			.info = catalog[i],
++		}, GiftButton::Mode::Minimal);
++		if (i == selected) {
++			button->toggleSelected(true, {}, anim::type::instant);
++		}
++		button->setClickedCallback([=] {
++			chosen(i);
++			box->closeBox();
++		});
++	}
++
++	gifts->widthValue() | rpl::on_next([=](int width) {
++		const auto singleMin = state->delegate.buttonSize();
++		if (width < singleMin.width()) {
++			return;
++		}
++		const auto count = int(state->buttons.size());
++		const auto skipw = st::giftBoxGiftSkip.x();
++		const auto skiph = st::giftBoxGiftSkip.y();
++		const auto perRow = std::min(
++			(width + skipw) / (singleMin.width() + skipw),
++			std::max(count, 1));
++		if (perRow <= 0) {
++			return;
++		}
++		const auto single = (width - (perRow - 1) * skipw) / perRow;
++		const auto height = singleMin.height();
++		const auto rows = (count + perRow - 1) / perRow;
++		for (auto index = 0; index != count; ++index) {
++			const auto row = index / perRow;
++			const auto column = index % perRow;
++			state->buttons[index]->setGeometry(
++				QRect(
++					column * (single + skipw),
++					row * (height + skiph),
++					single,
++					height),
++				state->delegate.buttonExtend());
++		}
++		gifts->resize(width, std::max(rows * (height + skiph) - skiph, 0));
++	}, gifts->lifetime());
++
++	box->addButton(tr::lng_cancel(), [=] {
++		box->closeBox();
++	});
++}
++
++void ChooseRecipient(
++		not_null<Window::SessionController*> controller,
++		Fn<void(not_null<PeerData*>)> chosen) {
++	const auto boxPointer = std::make_shared<QPointer<PeerListBox>>();
++	auto list = std::make_unique<ChooseRecipientBoxController>(
++		&controller->session(),
++		[=](not_null<Data::Thread*> thread) {
++			chosen(thread->peer());
++			if (const auto box = boxPointer->data()) {
++				box->closeBox();
++			}
++		},
++		[](not_null<Data::Thread*> thread) {
++			const auto user = thread->peer()->asUser();
++			return user && !user->isBot();
++		});
++	auto initBox = [=](not_null<PeerListBox*> box) {
++		*boxPointer = box.get();
++		box->setTitle(tr::ayu_LocalNftChooseRecipient());
++		box->addButton(tr::lng_cancel(), [=] {
++			box->closeBox();
++		});
++	};
++	controller->show(Box<PeerListBox>(std::move(list), std::move(initBox)));
 +}
 +
 +} // namespace
 +
 +void LocalNftConstructorBox(
 +		not_null<Ui::GenericBox*> box,
-+		not_null<Window::SessionController*> controller) {
++		not_null<Window::SessionController*> controller,
++		int editIndex,
++		PeerData *recipient) {
 +	const auto session = &controller->session();
-+	const auto state = box->lifetime().make_state<State>();
++	const auto state = box->lifetime().make_state<ConstructorState>();
 +	const auto container = box->verticalLayout();
-+	box->setTitle(tr::ayu_LocalNftConstructor());
++	{
++		const auto gifts = LoadGifts();
++		if (editIndex >= 0 && editIndex < int(gifts.size())) {
++			state->initial = gifts[editIndex];
++			const auto peerId = state->initial->peerId;
++			state->recipient = peerId
++				? session->data().peer(PeerId(peerId)).get()
++				: nullptr;
++		} else {
++			editIndex = -1;
++			state->recipient = (recipient && !recipient->isSelf())
++				? recipient
++				: nullptr;
++		}
++	}
++	const auto initial = state->initial;
++
++	box->setWidth(st::boxWideWidth);
++	box->setTitle(editIndex >= 0
++		? tr::ayu_LocalNftEdit()
++		: tr::ayu_LocalNftConstructor());
++
++	// The cover is added here once the first gift and attributes arrive.
++	const auto coverWrap = container->add(
++		object_ptr<Ui::VerticalLayout>(container));
 +
 +	const auto loading = tr::ayu_LocalNftLoading(tr::now);
 +	state->giftLabel = loading;
++	state->recipientLabel = RecipientName(state->recipient);
++
++	Ui::AddSkip(container);
 +	const auto addRow = [=](
 +			rpl::producer<QString> title,
-+			rpl::producer<QString> value) {
++			rpl::producer<QString> value,
++			const style::icon *icon) {
 +		return Settings::AddButtonWithLabel(
 +			container,
 +			std::move(title),
 +			std::move(value),
-+			st::settingsButtonNoIcon);
++			st::settingsButton,
++			{ icon });
 +	};
 +	const auto giftButton = addRow(
 +		tr::ayu_LocalNftGift(),
-+		state->giftLabel.value());
++		state->giftLabel.value(),
++		&st::menuIconGiftPremium);
 +	const auto modelButton = addRow(
 +		tr::ayu_LocalNftModel(),
-+		state->modelLabel.value());
++		state->modelLabel.value(),
++		&st::menuIconNftWear);
 +	const auto backdropButton = addRow(
 +		tr::ayu_LocalNftBackdrop(),
-+		state->backdropLabel.value());
++		state->backdropLabel.value(),
++		&st::menuIconPalette);
 +	const auto patternButton = addRow(
 +		tr::ayu_LocalNftPattern(),
-+		state->patternLabel.value());
++		state->patternLabel.value(),
++		&st::menuIconChangeColors);
++	const auto recipientButton = addRow(
++		tr::ayu_LocalNftRecipient(),
++		state->recipientLabel.value(),
++		&st::menuIconProfile);
++	Ui::AddSkip(container);
 +
-+	const auto title = box->addRow(object_ptr<Ui::InputField>(
-+		container,
-+		st::defaultInputField,
++	const auto title = AddField(
++		box,
 +		tr::ayu_LocalNftTitle(),
-+		QString()));
-+	const auto number = box->addRow(object_ptr<Ui::InputField>(
-+		container,
-+		st::defaultInputField,
++		initial ? initial->title : QString());
++	const auto number = AddField(
++		box,
 +		tr::ayu_LocalNftNumber(),
-+		u"1"_q));
-+	const auto owner = box->addRow(object_ptr<Ui::InputField>(
-+		container,
-+		st::defaultInputField,
-+		tr::ayu_LocalNftOwner(),
-+		session->user()->name()));
++		QString::number(initial ? initial->number : 1));
++	const auto stars = AddField(
++		box,
++		tr::ayu_LocalNftPriceStars(),
++		(initial && initial->resaleStars > 0)
++			? QString::number(initial->resaleStars)
++			: QString());
++	const auto ton = AddField(
++		box,
++		tr::ayu_LocalNftPriceTon(),
++		initial ? FormatNanoTon(initial->resaleNanoTon) : QString());
++	Ui::AddSkip(container);
 +
-+	const auto selectModel = [=](int index) {
-+		state->model = index;
-+		state->modelLabel = state->attributes.models[index].name;
++	const auto updateNumber = [=] {
++		state->numberText = u"#"_q + QString::number(
++			ParseNumber(number->getLastText()));
 +	};
-+	const auto selectBackdrop = [=](int index) {
-+		state->backdrop = index;
-+		state->backdropLabel = state->attributes.backdrops[index].name;
++	const auto updateResale = [=] {
++		state->resale = ResaleAmount(
++			ParseStars(stars->getLastText()),
++			ParseNanoTon(ton->getLastText()));
 +	};
-+	const auto selectPattern = [=](int index) {
-+		state->pattern = index;
-+		state->patternLabel = state->attributes.patterns[index].name;
++	updateNumber();
++	updateResale();
++
++	const auto ready = [=] {
++		const auto &list = state->attributes;
++		return (state->gift >= 0)
++			&& (state->model >= 0 && state->model < int(list.models.size()))
++			&& (state->backdrop >= 0
++				&& state->backdrop < int(list.backdrops.size()))
++			&& (state->pattern >= 0
++				&& state->pattern < int(list.patterns.size()));
 +	};
-+	const auto selectGift = [=](int index) {
++	const auto currentUnique = [=] {
++		const auto &list = state->attributes;
++		return Data::UniqueGift{
++			.title = title->getLastText().trimmed(),
++			.number = ParseNumber(number->getLastText()),
++			.model = list.models[state->model],
++			.pattern = list.patterns[state->pattern],
++			.backdrop = list.backdrops[state->backdrop],
++		};
++	};
++	const auto refreshCover = [=] {
++		if (!ready()) {
++			return;
++		}
++		const auto &list = state->attributes;
++		state->modelLabel = list.models[state->model].name;
++		state->backdropLabel = list.backdrops[state->backdrop].name;
++		state->patternLabel = list.patterns[state->pattern].name;
++		auto cover = Ui::UniqueGiftCover{ .values = currentUnique() };
++		if (state->cover) {
++			*state->cover = std::move(cover);
++			return;
++		}
++		state->cover = std::make_unique<rpl::variable<Ui::UniqueGiftCover>>(
++			std::move(cover));
++		Ui::AddUniqueGiftCover(coverWrap, state->cover->value(), {
++			.numberText = state->numberText.value(),
++			.resalePrice = state->resale.value(),
++		});
++		coverWrap->resizeToWidth(container->width());
++	};
++
++	title->changes() | rpl::on_next(refreshCover, title->lifetime());
++	number->changes() | rpl::on_next([=] {
++		updateNumber();
++		refreshCover();
++	}, number->lifetime());
++	stars->changes() | rpl::on_next(updateResale, stars->lifetime());
++	ton->changes() | rpl::on_next(updateResale, ton->lifetime());
++
++	const auto selectGift = [=](int index, bool applyInitial) {
 +		const auto &gift = state->catalog[index];
 +		state->gift = index;
 +		state->model = state->backdrop = state->pattern = -1;
@@ -688,7 +1326,9 @@ new file mode 100644
 +		state->modelLabel = loading;
 +		state->backdropLabel = loading;
 +		state->patternLabel = loading;
-+		title->setText(GiftTitle(gift));
++		if (!applyInitial || title->getLastText().trimmed().isEmpty()) {
++			title->setText(GiftTitle(gift));
++		}
 +		RequestAttributes(session, gift.id, crl::guard(box, [=](
 +				Data::UniqueGiftAttributes attributes) {
 +			if (state->gift != index) {
@@ -699,12 +1339,23 @@ new file mode 100644
 +			if (list.models.empty()
 +				|| list.backdrops.empty()
 +				|| list.patterns.empty()) {
++				state->modelLabel = QString();
++				state->backdropLabel = QString();
++				state->patternLabel = QString();
 +				controller->showToast(tr::ayu_LocalNftNoAttributes(tr::now));
 +				return;
 +			}
-+			selectModel(0);
-+			selectBackdrop(0);
-+			selectPattern(0);
++			const auto use = applyInitial
++				? initial
++				: std::optional<LocalGift>();
++			state->model = use ? FindIndex(list.models, use->modelName) : 0;
++			state->backdrop = use
++				? FindIndex(list.backdrops, use->backdropName)
++				: 0;
++			state->pattern = use
++				? FindIndex(list.patterns, use->patternName)
++				: 0;
++			refreshCover();
 +		}), crl::guard(box, [=](const QString &error) {
 +			controller->showToast(error);
 +		}));
@@ -722,105 +1373,121 @@ new file mode 100644
 +			controller->showToast(tr::ayu_LocalNftNoAttributes(tr::now));
 +			return;
 +		}
-+		selectGift(0);
++		auto index = 0;
++		if (initial) {
++			const auto i = ranges::find(
++				state->catalog,
++				initial->giftId,
++				&Data::StarGift::id);
++			if (i != end(state->catalog)) {
++				index = int(i - begin(state->catalog));
++			}
++		}
++		selectGift(index, initial.has_value());
 +	}), crl::guard(box, [=](const QString &error) {
 +		controller->showToast(error);
 +	}));
 +
-+	const auto choose = [=](
-+			QString boxTitle,
-+			std::vector<QString> labels,
-+			Fn<void(int)> chosen) {
-+		if (labels.empty()) {
++	giftButton->setClickedCallback([=] {
++		if (state->catalog.empty()) {
 +			return;
 +		}
 +		controller->show(Box(
-+			ChooseOptionBox,
-+			std::move(boxTitle),
-+			std::move(labels),
-+			std::move(chosen)));
-+	};
-+	giftButton->setClickedCallback([=] {
-+		auto labels = std::vector<QString>();
-+		labels.reserve(state->catalog.size());
-+		for (const auto &gift : state->catalog) {
-+			labels.push_back(GiftTitle(gift));
-+		}
-+		choose(
-+			tr::ayu_LocalNftGift(tr::now),
-+			std::move(labels),
-+			selectGift);
++			GiftPickerBox,
++			controller,
++			state->catalog,
++			state->gift,
++			crl::guard(box, [=](int index) {
++				selectGift(index, false);
++			})));
 +	});
++	const auto openAppearance = [=](Data::GiftAttributeIdType tab) {
++		if (!ready()) {
++			return;
++		}
++		const auto selected = std::make_shared<Data::UniqueGift>(
++			currentUnique());
++		controller->show(Box(
++			Ui::StarGiftAttributesChooseBox,
++			title->getLastText().trimmed(),
++			state->attributes,
++			tab,
++			selected,
++			crl::guard(box, [=](const Data::UniqueGift &chosen) {
++				const auto &list = state->attributes;
++				const auto model = FindIndexById(list.models, chosen.model);
++				const auto backdrop = FindIndexById(
++					list.backdrops,
++					chosen.backdrop);
++				const auto pattern = FindIndexById(
++					list.patterns,
++					chosen.pattern);
++				if (model >= 0) {
++					state->model = model;
++				}
++				if (backdrop >= 0) {
++					state->backdrop = backdrop;
++				}
++				if (pattern >= 0) {
++					state->pattern = pattern;
++				}
++				refreshCover();
++			})));
++	};
 +	modelButton->setClickedCallback([=] {
-+		choose(
-+			tr::ayu_LocalNftModel(tr::now),
-+			AttributeLabels(state->attributes.models),
-+			selectModel);
++		openAppearance(Data::GiftAttributeIdType::Model);
 +	});
 +	backdropButton->setClickedCallback([=] {
-+		choose(
-+			tr::ayu_LocalNftBackdrop(tr::now),
-+			AttributeLabels(state->attributes.backdrops),
-+			selectBackdrop);
++		openAppearance(Data::GiftAttributeIdType::Backdrop);
 +	});
 +	patternButton->setClickedCallback([=] {
-+		choose(
-+			tr::ayu_LocalNftPattern(tr::now),
-+			AttributeLabels(state->attributes.patterns),
-+			selectPattern);
++		openAppearance(Data::GiftAttributeIdType::Pattern);
++	});
++	recipientButton->setClickedCallback([=] {
++		ChooseRecipient(controller, crl::guard(box, [=](
++				not_null<PeerData*> peer) {
++			state->recipient = peer->isSelf() ? nullptr : peer.get();
++			state->recipientLabel = RecipientName(state->recipient);
++		}));
 +	});
 +
-+	const auto ready = [=] {
-+		if (state->gift >= 0
-+			&& state->model >= 0
-+			&& state->backdrop >= 0
-+			&& state->pattern >= 0) {
-+			return true;
-+		}
-+		controller->showToast(tr::ayu_LocalNftSelectAll(tr::now));
-+		return false;
-+	};
 +	const auto current = [=] {
 +		const auto &list = state->attributes;
++		const auto starsPrice = ParseStars(stars->getLastText());
 +		return LocalGift{
 +			.giftId = state->catalog[state->gift].id,
 +			.title = title->getLastText().trimmed(),
 +			.modelName = list.models[state->model].name,
 +			.backdropName = list.backdrops[state->backdrop].name,
 +			.patternName = list.patterns[state->pattern].name,
-+			.ownerName = owner->getLastText().trimmed(),
-+			.number = std::clamp(
-+				number->getLastText().trimmed().toInt(),
-+				1,
-+				kMaxNumber),
-+			.date = base::unixtime::now(),
++			.peerId = state->recipient ? state->recipient->id.value : 0,
++			.number = ParseNumber(number->getLastText()),
++			.date = initial ? initial->date : base::unixtime::now(),
++			.resaleStars = starsPrice,
++			.resaleNanoTon = starsPrice
++				? int64(0)
++				: ParseNanoTon(ton->getLastText()),
 +		};
 +	};
-+	box->addLeftButton(tr::ayu_LocalNftPreview(), [=] {
-+		if (!ready()) {
-+			return;
-+		}
-+		const auto &list = state->attributes;
-+		Settings::ShowSavedStarGiftBox(
-+			controller,
-+			session->user(),
-+			BuildSavedGift(
-+				state->catalog[state->gift],
-+				list.models[state->model],
-+				list.patterns[state->pattern],
-+				list.backdrops[state->backdrop],
-+				current(),
-+				GiftsCount()));
-+	});
 +	box->addButton(tr::lng_settings_save(), [=] {
 +		if (!ready()) {
++			controller->showToast(tr::ayu_LocalNftSelectAll(tr::now));
 +			return;
 +		}
 +		auto gifts = LoadGifts();
-+		gifts.push_back(current());
-+		SaveGifts(gifts);
-+		NotifyGiftsChanged(controller);
-+		controller->showToast(tr::ayu_LocalNftSaved(tr::now));
++		const auto gift = current();
++		if (editIndex >= 0 && editIndex < int(gifts.size())) {
++			const auto was = GiftOwnerId(session, gifts[editIndex]);
++			gifts[editIndex] = gift;
++			SaveGifts(gifts);
++			NotifyGiftsChanged(controller, was);
++			controller->showToast(tr::ayu_LocalNftUpdated(tr::now));
++		} else {
++			gifts.push_back(gift);
++			SaveGifts(gifts);
++			controller->showToast(tr::ayu_LocalNftSaved(tr::now));
++		}
++		NotifyGiftsChanged(controller, GiftOwnerId(session, gift));
 +		box->closeBox();
 +	});
 +	box->addButton(tr::lng_cancel(), [=] {
@@ -831,32 +1498,152 @@ new file mode 100644
 +void LocalNftListBox(
 +		not_null<Ui::GenericBox*> box,
 +		not_null<Window::SessionController*> controller) {
++	const auto session = &controller->session();
 +	box->setTitle(tr::ayu_LocalNftList());
 +	const auto gifts = LoadGifts();
 +	for (auto i = 0; i != int(gifts.size()); ++i) {
-+		const auto button = Settings::AddButtonWithIcon(
++		const auto &gift = gifts[i];
++		const auto owner = GiftOwnerId(session, gift);
++		const auto label = (owner == session->userPeerId())
++			? QString()
++			: session->data().peer(owner)->name();
++		const auto button = Settings::AddButtonWithLabel(
 +			box->verticalLayout(),
-+			rpl::single(gifts[i].title
++			rpl::single(gift.title
 +				+ u" #"_q
-+				+ QString::number(gifts[i].number)),
++				+ QString::number(gift.number)),
++			rpl::single(label),
++			st::settingsButtonNoIcon);
++		button->setClickedCallback([=] {
++			box->closeBox();
++			controller->show(Box(
++				LocalNftConstructorBox,
++				controller,
++				i,
++				(PeerData*)nullptr));
++		});
++	}
++	box->addButton(tr::lng_close(), [=] {
++		box->closeBox();
++	});
++}
++
++void FillLocalGiftMenu(
++		not_null<Ui::PopupMenu*> menu,
++		not_null<Window::SessionController*> controller,
++		int index) {
++	menu->addAction(tr::ayu_LocalNftEdit(tr::now), [=] {
++		controller->show(Box(
++			LocalNftConstructorBox,
++			controller,
++			index,
++			(PeerData*)nullptr));
++	}, &st::menuIconEdit);
++	menu->addAction(tr::ayu_LocalNftDelete(tr::now), [=] {
++		controller->show(Ui::MakeConfirmBox({
++			.text = tr::ayu_LocalNftDeleteConfirm(tr::rich),
++			.confirmed = [=](Fn<void()> &&close) {
++				auto gifts = LoadGifts();
++				if (index >= 0 && index < int(gifts.size())) {
++					const auto owner = GiftOwnerId(
++						&controller->session(),
++						gifts[index]);
++					gifts.erase(begin(gifts) + index);
++					SaveGifts(gifts);
++					NotifyGiftsChanged(controller, owner);
++				}
++				close();
++			},
++			.confirmText = tr::ayu_LocalNftDelete(),
++		}));
++	}, &st::menuIconDelete);
++}
++
++void LocalUsernamesBox(
++		not_null<Ui::GenericBox*> box,
++		not_null<Window::SessionController*> controller) {
++	box->setTitle(tr::ayu_LocalUsernames());
++	box->setWidth(st::boxWideWidth);
++
++	const auto list = LoadUsernames();
++	for (auto i = 0; i != int(list.size()); ++i) {
++		const auto &entry = list[i];
++		const auto price = FormatNanoTon(entry.nanoTon);
++		const auto button = Settings::AddButtonWithLabel(
++			box->verticalLayout(),
++			rpl::single(u"@"_q + entry.username),
++			rpl::single(price.isEmpty() ? QString() : (price + u" TON"_q)),
 +			st::settingsButtonNoIcon);
 +		button->setClickedCallback([=] {
 +			controller->show(Ui::MakeConfirmBox({
-+				.text = tr::ayu_LocalNftDeleteConfirm(tr::rich),
++				.text = tr::ayu_LocalUsernameDeleteConfirm(tr::rich),
 +				.confirmed = [=](Fn<void()> &&close) {
-+					auto now = LoadGifts();
++					auto now = LoadUsernames();
 +					if (i < int(now.size())) {
 +						now.erase(begin(now) + i);
-+						SaveGifts(now);
-+						NotifyGiftsChanged(controller);
++						SaveUsernames(now);
 +					}
 +					close();
 +					box->closeBox();
 +				},
-+				.confirmText = tr::lng_box_yes(),
++				.confirmText = tr::ayu_LocalNftDelete(),
 +			}));
 +		});
 +	}
++	if (!list.empty()) {
++		Ui::AddSkip(box->verticalLayout());
++	}
++
++	const auto username = AddField(box, tr::ayu_LocalUsername(), QString());
++	const auto tonPrice = AddField(
++		box,
++		tr::ayu_LocalUsernamePriceTon(),
++		QString());
++	const auto usdPrice = AddField(
++		box,
++		tr::ayu_LocalUsernamePriceUsd(),
++		QString());
++	const auto date = AddField(
++		box,
++		tr::ayu_LocalUsernameDate(),
++		QDate::currentDate().toString(QString::fromLatin1(kDateFormat)));
++
++	box->addButton(tr::ayu_LocalUsernameAdd(), [=] {
++		auto name = username->getLastText().trimmed();
++		if (name.startsWith('@')) {
++			name = name.mid(1);
++		}
++		static const auto kValid = QRegularExpression(
++			u"^[A-Za-z][A-Za-z0-9_]{3,31}$"_q);
++		if (!kValid.match(name).hasMatch()) {
++			username->showError();
++			controller->showToast(tr::ayu_LocalUsernameInvalid(tr::now));
++			return;
++		}
++		const auto parsedDate = QDate::fromString(
++			date->getLastText().trimmed(),
++			QString::fromLatin1(kDateFormat));
++		const auto when = parsedDate.isValid()
++			? QDateTime(parsedDate, QTime(12, 0)).toSecsSinceEpoch()
++			: QDateTime::currentSecsSinceEpoch();
++		auto usdText = usdPrice->getLastText().trimmed();
++		usdText.replace(',', '.');
++		const auto usd = std::max(usdText.toDouble(), 0.);
++
++		auto now = LoadUsernames();
++		now.erase(ranges::remove_if(now, [&](const LocalUsername &entry) {
++			return !entry.username.compare(name, Qt::CaseInsensitive);
++		}), end(now));
++		now.push_back({
++			.username = name,
++			.nanoTon = ParseNanoTon(tonPrice->getLastText()),
++			.usdCents = int64(std::llround(usd * 100.)),
++			.date = TimeId(when),
++		});
++		SaveUsernames(now);
++		controller->showToast(tr::ayu_LocalUsernameAdded(tr::now));
++		box->closeBox();
++	});
 +	box->addButton(tr::lng_close(), [=] {
 +		box->closeBox();
 +	});
@@ -867,7 +1654,7 @@ diff --git a/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.h b/Telegram/Source
 new file mode 100644
 --- /dev/null
 +++ b/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.h
-@@ -0,0 +1,27 @@
+@@ -0,0 +1,40 @@
 +// This is the source code of AyuGram for Desktop.
 +//
 +// We do not and cannot prevent the use of our code,
@@ -878,6 +1665,7 @@ new file mode 100644
 +
 +namespace Ui {
 +class GenericBox;
++class PopupMenu;
 +} // namespace Ui
 +
 +namespace Window {
@@ -886,11 +1674,23 @@ new file mode 100644
 +
 +namespace AyuCosmetics {
 +
++// editIndex is a position in LoadGifts(), or -1 for a new gift.
 +void LocalNftConstructorBox(
++	not_null<Ui::GenericBox*> box,
++	not_null<Window::SessionController*> controller,
++	int editIndex,
++	PeerData *recipient);
++
++void LocalNftListBox(
 +	not_null<Ui::GenericBox*> box,
 +	not_null<Window::SessionController*> controller);
 +
-+void LocalNftListBox(
++void FillLocalGiftMenu(
++	not_null<Ui::PopupMenu*> menu,
++	not_null<Window::SessionController*> controller,
++	int index);
++
++void LocalUsernamesBox(
 +	not_null<Ui::GenericBox*> box,
 +	not_null<Window::SessionController*> controller);
 +
@@ -899,7 +1699,7 @@ diff --git a/Telegram/SourceFiles/ayu/ui/settings/settings_cosmetics.cpp b/Teleg
 new file mode 100644
 --- /dev/null
 +++ b/Telegram/SourceFiles/ayu/ui/settings/settings_cosmetics.cpp
-@@ -0,0 +1,207 @@
+@@ -0,0 +1,334 @@
 +// This is the source code of AyuGram for Desktop.
 +//
 +// We do not and cannot prevent the use of our code,
@@ -939,6 +1739,36 @@ new file mode 100644
 +namespace {
 +
 +constexpr auto kMaxRatingLevel = 90;
++constexpr auto kMaxLocalStars = int64(1'000'000'000'000);
++
++[[nodiscard]] QString BadgeStyleName(int style) {
++	using Style = ::AyuCosmetics::BadgeStyle;
++	switch (Style(style)) {
++	case Style::Developer: return tr::ayu_LocalBadgeStyleDeveloper(tr::now);
++	case Style::Emoji: return tr::ayu_LocalBadgeStyleEmoji(tr::now);
++	case Style::Supporter: break;
++	}
++	return tr::ayu_LocalBadgeStyleSupporter(tr::now);
++}
++
++void ChooseBadgeStyleBox(not_null<Ui::GenericBox*> box) {
++	box->setTitle(tr::ayu_LocalBadgeStyle());
++	const auto current = AyuSettings::getInstance().localBadgeStyle();
++	for (const auto style : { 0, 1, 2 }) {
++		const auto button = AddButtonWithLabel(
++			box->verticalLayout(),
++			rpl::single(BadgeStyleName(style)),
++			rpl::single((style == current) ? u"✓"_q : QString()),
++			st::settingsButtonNoIcon);
++		button->setClickedCallback([=] {
++			AyuSettings::getInstance().setLocalBadgeStyle(style);
++			box->closeBox();
++		});
++	}
++	box->addButton(tr::lng_cancel(), [=] {
++		box->closeBox();
++	});
++}
 +
 +void BuildBadge(SectionBuilder &builder, AyuSectionBuilder &ayu) {
 +	const auto controller = builder.controller();
@@ -952,13 +1782,28 @@ new file mode 100644
 +		.setter = &AyuSettings::setLocalBadgeEnabled,
 +		.icon = { &st::menuIconPremium },
 +	});
++	builder.addButton({
++		.id = u"ayu/localBadgeStyle"_q,
++		.title = tr::ayu_LocalBadgeStyle(),
++		.icon = { &st::menuIconChangeColors },
++		.label = AyuSettings::getInstance().localBadgeStyleValue(
++		) | rpl::map(BadgeStyleName),
++		.onClick = [=] {
++			controller->show(Box(ChooseBadgeStyleBox));
++		},
++	});
 +	builder.add([=](const BuildContext &ctx) {
 +		v::match(ctx, [&](const WidgetContext &wctx) {
 +			const auto container = wctx.container;
 +			const auto panel = container->lifetime().make_state<
 +				Info::Profile::EmojiStatusPanel>();
 +			panel->setChooseFilter([=](EmojiStatusId id) {
-+				AyuSettings::getInstance().setLocalBadgeEmojiId(id.documentId);
++				auto &settings = AyuSettings::getInstance();
++				settings.setLocalBadgeEmojiId(id.documentId);
++				if (id.documentId) {
++					settings.setLocalBadgeStyle(
++						int(::AyuCosmetics::BadgeStyle::Emoji));
++				}
 +				panel->hideAnimated();
 +				return false;
 +			});
@@ -1054,7 +1899,9 @@ new file mode 100644
 +		.onClick = [=] {
 +			controller->show(Box(
 +				::AyuCosmetics::LocalNftConstructorBox,
-+				controller));
++				controller,
++				-1,
++				(PeerData*)nullptr));
 +		},
 +	});
 +	builder.addButton({
@@ -1074,6 +1921,84 @@ new file mode 100644
 +	builder.addSkip();
 +}
 +
++void BuildBalance(SectionBuilder &builder) {
++	const auto controller = builder.controller();
++
++	builder.addDivider();
++	builder.addSkip();
++	builder.addSubsectionTitle(tr::ayu_LocalBalanceHeader());
++	builder.addButton({
++		.id = u"ayu/localStars"_q,
++		.title = tr::ayu_LocalStars(),
++		.icon = { &st::menuIconStar },
++		.label = AyuSettings::getInstance().localStarsValue(
++		) | rpl::map([](int64 value) {
++			return value ? QString::number(value) : QString();
++		}),
++		.onClick = [=] {
++			controller->show(Box<EditMarkBox>(
++				tr::ayu_LocalStars(),
++				QString::number(AyuSettings::getInstance().localStars()),
++				u"0"_q,
++				[](const QString &value) {
++					AyuSettings::getInstance().setLocalStars(std::clamp(
++						value.trimmed().toLongLong(),
++						int64(0),
++						kMaxLocalStars));
++					::AyuCosmetics::RefreshBalances();
++				}));
++		},
++	});
++	builder.addButton({
++		.id = u"ayu/localTon"_q,
++		.title = tr::ayu_LocalTon(),
++		.icon = { &st::menuIconEarn },
++		.label = AyuSettings::getInstance().localTonValue(
++		) | rpl::map([](const QString &value) {
++			return ::AyuCosmetics::FormatNanoTon(
++				::AyuCosmetics::ParseNanoTon(value));
++		}),
++		.onClick = [=] {
++			controller->show(Box<EditMarkBox>(
++				tr::ayu_LocalTon(),
++				AyuSettings::getInstance().localTon(),
++				u"0"_q,
++				[](const QString &value) {
++					AyuSettings::getInstance().setLocalTon(
++						::AyuCosmetics::FormatNanoTon(
++							::AyuCosmetics::ParseNanoTon(value)));
++					::AyuCosmetics::RefreshBalances();
++				}));
++		},
++	});
++	builder.addSkip();
++	builder.addDividerText(tr::ayu_LocalBalanceDescription());
++}
++
++void BuildUsernames(SectionBuilder &builder) {
++	const auto controller = builder.controller();
++
++	builder.addSkip();
++	builder.addSubsectionTitle(tr::ayu_LocalUsernames());
++	builder.addButton({
++		.id = u"ayu/localUsernames"_q,
++		.title = tr::ayu_LocalUsernamesManage(),
++		.icon = { &st::menuIconUsername },
++		.label = AyuSettings::getInstance().localUsernamesValue(
++		) | rpl::map([](const QString &) {
++			const auto count = int(::AyuCosmetics::LoadUsernames().size());
++			return count ? QString::number(count) : QString();
++		}),
++		.onClick = [=] {
++			controller->show(Box(
++				::AyuCosmetics::LocalUsernamesBox,
++				controller));
++		},
++	});
++	builder.addSkip();
++	builder.addDividerText(tr::ayu_LocalUsernamesDescription());
++}
++
 +const auto kMeta = BuildHelper({
 +	.id = AyuCosmetics::Id(),
 +	.parentId = AyuMain::Id(),
@@ -1085,6 +2010,8 @@ new file mode 100644
 +	BuildBadge(builder, ayu);
 +	BuildProfile(builder, ayu);
 +	BuildGifts(builder);
++	BuildBalance(builder);
++	BuildUsernames(builder);
 +});
 +
 +} // namespace
@@ -1176,11 +2103,36 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
  #include "ayu/data/messages_storage.h"
  #include "ayu/features/filters/filters_controller.h"
  #include "ayu/ui/boxes/donate_info_box.h"
-@@ -181,15 +182,32 @@
+@@ -175,21 +176,55 @@
+ 	return peer->id.value & PeerId::kChatTypeMask;
+ }
+ 
++namespace {
++
++[[nodiscard]] bool IsLocalBadgeOfStyle(
++		ID peerId,
++		AyuCosmetics::BadgeStyle style) {
++	if (AyuCosmetics::LocalBadgeStyle() != style) {
++		return false;
++	} else if (style == AyuCosmetics::BadgeStyle::Emoji
++		&& !AyuSettings::getInstance().localBadgeEmojiId()) {
++		return false;
++	}
++	return AyuCosmetics::IsLocalBadgePeer(peerId);
++}
++
++} // namespace
++
+ bool isExteraPeer(ID peerId) {
++	if (IsLocalBadgeOfStyle(peerId, AyuCosmetics::BadgeStyle::Developer)) {
++		return true;
++	}
+ 	return RCManager::getInstance().developers().contains(peerId) || RCManager::getInstance().channels().
+ 		contains(peerId);
  }
  
  bool isSupporterPeer(ID peerId) {
-+	if (AyuCosmetics::IsLocalBadgePeer(peerId)) {
++	if (IsLocalBadgeOfStyle(peerId, AyuCosmetics::BadgeStyle::Supporter)) {
 +		return true;
 +	}
  	return RCManager::getInstance().supporters().contains(peerId) || RCManager::getInstance().supporterChannels().
@@ -1188,8 +2140,7 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
  }
  
  bool isCustomBadgePeer(ID peerId) {
-+	if (AyuSettings::getInstance().localBadgeEmojiId()
-+		&& AyuCosmetics::IsLocalBadgePeer(peerId)) {
++	if (IsLocalBadgeOfStyle(peerId, AyuCosmetics::BadgeStyle::Emoji)) {
 +		return true;
 +	}
  	return RCManager::getInstance().supporterCustomBadges().contains(peerId);
@@ -1197,8 +2148,7 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
  
  CustomBadge getCustomBadge(ID peerId) {
 +	const auto &settings = AyuSettings::getInstance();
-+	if (settings.localBadgeEmojiId()
-+		&& AyuCosmetics::IsLocalBadgePeer(peerId)) {
++	if (IsLocalBadgeOfStyle(peerId, AyuCosmetics::BadgeStyle::Emoji)) {
 +		return {
 +			.emojiStatusId = EmojiStatusId{
 +				DocumentId(settings.localBadgeEmojiId()),
@@ -1209,7 +2159,26 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
  	const auto &badges = RCManager::getInstance().supporterCustomBadges();
  	if (const auto it = badges.find(peerId); it != badges.end()) {
  		return it->second;
-@@ -227,6 +245,7 @@
+@@ -217,7 +252,17 @@
+ }
+ 
+ rpl::producer<Info::Profile::Badge::Content> ExteraBadgeTypeFromPeer(not_null<PeerData*> peer) {
+-	return rpl::single(ComputeExteraBadgeContent(peer));
++	if (!peer->isSelf()) {
++		return rpl::single(ComputeExteraBadgeContent(peer));
++	}
++	// The local badge follows its settings without a restart.
++	return rpl::single(
++		rpl::empty
++	) | rpl::then(
++		AyuSettings::getInstance().localBadgeChanges()
++	) | rpl::map([=] {
++		return ComputeExteraBadgeContent(peer);
++	});
+ }
+ 
+ Fn<void()> badgeClickHandler(not_null<PeerData*> peer) {
+@@ -227,6 +272,7 @@
  		const auto isCustomBadge = isCustomBadgePeer(getBareID(peer));
  		const auto isExtera = isExteraPeer(getBareID(peer));
  		const auto isSupporter = isSupporterPeer(getBareID(peer));
@@ -1217,7 +2186,7 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
  
  		TextWithEntities text;
  		if (isCustomBadge) {
-@@ -257,11 +276,14 @@
+@@ -257,13 +303,22 @@
  						   TextWithEntities{peer->name()},
  						   tr::rich);
  		} else if (isSupporter) {
@@ -1236,8 +2205,16 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
 +					tr::rich);
  		} else {
  			return;
++		}
++		if (isLocal) {
++			const auto &localText = AyuSettings::getInstance().localBadgeText();
++			if (!localText.isEmpty()) {
++				text = tr::rich(localText);
++			}
  		}
-@@ -273,7 +295,7 @@
+ 
+ 		auto config = Ui::Toast::Config{
+@@ -273,7 +328,7 @@
  			.adaptive = true,
  			.duration = 3 * crl::time(1000),
  		};
@@ -1246,6 +2223,148 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
  			Ayu::Ui::ShowToastWithAction(
  				std::move(config),
  				tr::lng_collectible_learn_more(tr::now),
+diff --git a/Telegram/SourceFiles/boxes/star_gift_preview_box.cpp b/Telegram/SourceFiles/boxes/star_gift_preview_box.cpp
+--- a/Telegram/SourceFiles/boxes/star_gift_preview_box.cpp
++++ b/Telegram/SourceFiles/boxes/star_gift_preview_box.cpp
+@@ -1331,19 +1331,22 @@
+ 	return result;
+ }
+ 
+-} // namespace
+-
+-void StarGiftPreviewBox(
++void StarGiftPreviewBoxImpl(
+ 		not_null<GenericBox*> box,
+ 		const QString &title,
+ 		Data::UniqueGiftAttributes attributes,
+ 		Data::GiftAttributeIdType tab,
+-		std::shared_ptr<Data::UniqueGift> selected) {
++		std::shared_ptr<Data::UniqueGift> selected,
++		Fn<void(const Data::UniqueGift &)> chosen) {
+ 	Expects(!attributes.models.empty());
+ 	Expects(!attributes.patterns.empty());
+ 	Expects(!attributes.backdrops.empty());
+ 
+ 	const auto filter = [&](auto &list, auto attribute) {
++		if (chosen) {
++			// AyuGram: every pattern and backdrop stays pickable.
++			return;
++		}
+ 		const auto rarityProj = &Data::UniqueGiftAttribute::rarityType;
+ 		const auto simple = Data::UniqueGiftRarity::Default;
+ 		if (!selected || ((*selected).*attribute).rarityType() == simple) {
+@@ -1539,6 +1542,21 @@
+ 			|| (value.pattern >= 0)
+ 			|| (value.backdrop >= 0);
+ 		state->push();
++		const auto &list = state->attributes;
++		if (chosen
++			&& value.model >= 0
++			&& value.model < int(list.models.size())
++			&& value.pattern >= 0
++			&& value.pattern < int(list.patterns.size())
++			&& value.backdrop >= 0
++			&& value.backdrop < int(list.backdrops.size())) {
++			chosen(Data::UniqueGift{
++				.title = state->title,
++				.model = list.models[value.model],
++				.pattern = list.patterns[value.pattern],
++				.backdrop = list.backdrops[value.backdrop],
++			});
++		}
+ 	}, box->lifetime());
+ 	state->list->modelsToggled(
+ 	) | rpl::on_next([=](std::vector<Data::UniqueGiftModel> models) {
+@@ -1601,4 +1619,37 @@
+ 	}, box->lifetime());
+ }
+ 
++} // namespace
++
++void StarGiftPreviewBox(
++		not_null<GenericBox*> box,
++		const QString &title,
++		Data::UniqueGiftAttributes attributes,
++		Data::GiftAttributeIdType tab,
++		std::shared_ptr<Data::UniqueGift> selected) {
++	StarGiftPreviewBoxImpl(
++		box,
++		title,
++		std::move(attributes),
++		tab,
++		std::move(selected),
++		nullptr);
++}
++
++void StarGiftAttributesChooseBox(
++		not_null<GenericBox*> box,
++		const QString &title,
++		Data::UniqueGiftAttributes attributes,
++		Data::GiftAttributeIdType tab,
++		std::shared_ptr<Data::UniqueGift> selected,
++		Fn<void(const Data::UniqueGift &)> chosen) {
++	StarGiftPreviewBoxImpl(
++		box,
++		title,
++		std::move(attributes),
++		tab,
++		std::move(selected),
++		std::move(chosen));
++}
++
+ } // namespace Ui
+diff --git a/Telegram/SourceFiles/boxes/star_gift_preview_box.h b/Telegram/SourceFiles/boxes/star_gift_preview_box.h
+--- a/Telegram/SourceFiles/boxes/star_gift_preview_box.h
++++ b/Telegram/SourceFiles/boxes/star_gift_preview_box.h
+@@ -29,4 +29,13 @@
+ 	Data::GiftAttributeIdType tab,
+ 	std::shared_ptr<Data::UniqueGift> selected);
+ 
++// AyuGram: the same box, every tap reports the picked attributes.
++void StarGiftAttributesChooseBox(
++	not_null<GenericBox*> box,
++	const QString &title,
++	Data::UniqueGiftAttributes attributes,
++	Data::GiftAttributeIdType tab,
++	std::shared_ptr<Data::UniqueGift> selected,
++	Fn<void(const Data::UniqueGift &)> chosen);
++
+ } // namespace Ui
+diff --git a/Telegram/SourceFiles/data/components/credits.cpp b/Telegram/SourceFiles/data/components/credits.cpp
+--- a/Telegram/SourceFiles/data/components/credits.cpp
++++ b/Telegram/SourceFiles/data/components/credits.cpp
+@@ -13,6 +13,9 @@
+ #include "lang/lang_keys.h"
+ #include "main/main_app_config.h"
+ #include "main/main_session.h"
++
++// AyuGram includes
++#include "ayu/features/local_cosmetics/local_cosmetics.h"
+ 
+ namespace Data {
+ namespace {
+@@ -180,7 +183,9 @@
+ 	Expects(_locked >= count);
+ 
+ 	_locked -= count;
+-	apply(_balance >= count ? (_balance - count) : CreditsAmount(0));
++	// AyuGram: apply() adds the local amount again, so it is taken off here.
++	apply((_balance >= count ? (_balance - count) : CreditsAmount(0))
++		- AyuCosmetics::LocalStarsAmount());
+ 	invalidate();
+ }
+ 
+@@ -189,6 +194,10 @@
+ }
+ 
+ void Credits::apply(CreditsAmount balance) {
++	// AyuGram: a local amount is added on top of every server balance.
++	balance += balance.ton()
++		? AyuCosmetics::LocalTonAmount()
++		: AyuCosmetics::LocalStarsAmount();
+ 	if (balance.ton()) {
+ 		_tonBalance = balance;
+ 
 diff --git a/Telegram/SourceFiles/data/data_user.cpp b/Telegram/SourceFiles/data/data_user.cpp
 --- a/Telegram/SourceFiles/data/data_user.cpp
 +++ b/Telegram/SourceFiles/data/data_user.cpp
@@ -1262,7 +2381,7 @@ diff --git a/Telegram/SourceFiles/data/data_user.cpp b/Telegram/SourceFiles/data
  
  int UserData::peerGiftsCount() const {
 -	return _peerGiftsCount;
-+	return _peerGiftsCount + (isSelf() ? AyuCosmetics::GiftsCount() : 0);
++	return _peerGiftsCount + AyuCosmetics::GiftsCountFor(this);
  }
  
  void UserData::setPeerGiftsCount(int count) {
@@ -1298,25 +2417,46 @@ diff --git a/Telegram/SourceFiles/data/data_user.cpp b/Telegram/SourceFiles/data
 diff --git a/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp b/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp
 --- a/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp
 +++ b/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp
-@@ -50,6 +50,9 @@
+@@ -50,6 +50,11 @@
  #include "styles/style_menu_icons.h"
  #include "styles/style_credits.h" // giftBoxPadding
  
 +// AyuGram includes
++#include "ayu/ayu_settings.h"
 +#include "ayu/features/local_cosmetics/local_cosmetics.h"
++#include "ayu/ui/boxes/local_nft_box.h"
 +
  #include <QtWidgets/QApplication>
  
  namespace Info::PeerGifts {
-@@ -216,6 +219,7 @@
+@@ -216,6 +221,8 @@
  	void loadCollections();
  	void loadMore();
  	void loaded(const MTPpayments_SavedStarGifts &result);
++	void refreshLocalGifts();
 +	void insertLocalGifts(std::vector<Data::SavedStarGift> gifts);
  	void markInCollection(const Data::SavedStarGift &gift);
  	void refreshButtons();
  	void validateButtons();
-@@ -710,6 +714,7 @@
+@@ -369,6 +376,17 @@
+ 
+ 	loadCollections();
+ 
++	if (_peer->isUser() && !_addingToCollectionId) {
++		// Warms the cache, so the local gifts come with the first page.
++		AyuCosmetics::PreloadGifts(_peer);
++		AyuSettings::getInstance().localGiftsChanges(
++		) | rpl::on_next([=] {
++			if (!_list->empty() || _entries->allLoaded) {
++				refreshLocalGifts();
++			}
++		}, lifetime());
++	}
++
+ 	_window->session().data().giftsUpdates(
+ 	) | rpl::on_next([=](const Data::GiftsUpdate &update) {
+ 		if (update.peer != _peer) {
+@@ -710,6 +728,7 @@
  		_entries->filter = filter;
  		_list->clear();
  	}
@@ -1324,30 +2464,39 @@ diff --git a/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp b/T
  	_list->reserve(_list->size() + data.vgifts().v.size());
  
  	const auto i = ranges::find(
-@@ -743,6 +748,43 @@
+@@ -743,6 +762,54 @@
  	if (hasUnique) {
  		Ui::PreloadUniqueGiftResellPrices(&_peer->session());
  	}
-+	if (firstPage
-+		&& _peer->isSelf()
-+		&& !descriptor.collectionId
-+		&& !_addingToCollectionId
-+		&& !filter.skipUnique
-+		&& !filter.skipSaved) {
-+		AyuCosmetics::ResolveGifts(&_peer->session(), crl::guard(this, [=](
-+				std::vector<Data::SavedStarGift> gifts) {
-+			insertLocalGifts(std::move(gifts));
-+		}));
++	if (firstPage) {
++		refreshLocalGifts();
 +	}
 +}
 +
++void InnerWidget::refreshLocalGifts() {
++	const auto descriptor = _descriptor.current();
++	const auto &filter = descriptor.filter;
++	if (!_peer->isUser()
++		|| descriptor.collectionId
++		|| _addingToCollectionId
++		|| filter.skipUnique
++		|| filter.skipSaved) {
++		return;
++	}
++	AyuCosmetics::ResolveGifts(_peer, crl::guard(this, [=](
++			std::vector<Data::SavedStarGift> gifts) {
++		insertLocalGifts(std::move(gifts));
++	}));
++}
++
 +void InnerWidget::insertLocalGifts(std::vector<Data::SavedStarGift> gifts) {
-+	if (gifts.empty() || _descriptor.current().collectionId) {
++	if (_descriptor.current().collectionId) {
 +		return;
 +	}
 +	const auto isLocal = [](const Entry &entry) {
 +		return AyuCosmetics::IsLocalGiftId(entry.gift.info.id);
 +	};
++	const auto was = int(ranges::count_if(*_list, isLocal));
 +	_list->erase(ranges::remove_if(*_list, isLocal), end(*_list));
 +	// Kept after the pinned gifts, markPinned relies on them being first.
 +	auto position = ranges::find_if(*_list, [](const Entry &entry) {
@@ -1362,23 +2511,30 @@ diff --git a/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp b/T
 +	}
 +	_entries->total = _entries->allLoaded
 +		? int(_entries->list.size())
-+		: (_entries->total + int(gifts.size()));
++		: std::max(
++			_entries->total - was + int(gifts.size()),
++			int(_entries->list.size()));
 +	refreshButtons();
 +	refreshAbout();
  }
  
  void InnerWidget::markInCollection(const Data::SavedStarGift &gift) {
-@@ -1178,7 +1220,8 @@
- 		}
- 		return -1;
+@@ -1180,6 +1247,14 @@
  	}();
--	if (index < 0) {
-+	if (index < 0
-+		|| AyuCosmetics::IsLocalGiftId((*_list)[index].gift.info.id)) {
+ 	if (index < 0) {
  		return;
++	} else if (const auto local = AyuCosmetics::LocalGiftIndex(
++			(*_list)[index].gift.info.id); local >= 0) {
++		_menu = base::make_unique_q<Ui::PopupMenu>(
++			this,
++			st::popupMenuWithIcons);
++		AyuCosmetics::FillLocalGiftMenu(_menu.get(), _window, local);
++		_menu->popup(point);
++		return;
  	}
  
-@@ -1232,6 +1275,9 @@
+ 	auto entry = ::Settings::SavedStarGiftEntry(
+@@ -1232,6 +1307,9 @@
  
  	if (const auto id = _addingToCollectionId) {
  		const auto &gift = (*_list)[index].gift;
@@ -1388,3 +2544,93 @@ diff --git a/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp b/T
  		auto changes = _collectionChanges.current();
  		const auto selected = _inCollection.contains(gift.manageId);
  		if (selected) {
+diff --git a/Telegram/SourceFiles/info/profile/info_profile_values.cpp b/Telegram/SourceFiles/info/profile/info_profile_values.cpp
+--- a/Telegram/SourceFiles/info/profile/info_profile_values.cpp
++++ b/Telegram/SourceFiles/info/profile/info_profile_values.cpp
+@@ -37,6 +37,10 @@
+ #include "boxes/peers/edit_peer_permissions_box.h"
+ #include "base/unixtime.h"
+ 
++// AyuGram includes
++#include "ayu/ayu_settings.h"
++#include "ayu/features/local_cosmetics/local_cosmetics.h"
++
+ namespace Info {
+ namespace Profile {
+ namespace {
+@@ -224,6 +228,20 @@
+ 		peer->session().changes().peerFlagsValue(peer, UpdateFlag::Usernames)
+ 	);
+ 	if (const auto user = peer->asUser()) {
++		if (user->isSelf()) {
++			return rpl::combine(
++				std::move(value),
++				AyuSettings::getInstance().localUsernamesValue()
++			) | rpl::map([=](const auto &, const auto &) {
++				auto list = std::vector<QString>(user->usernames());
++				for (const auto &local : AyuCosmetics::LoadUsernames()) {
++					if (!ranges::contains(list, local.username)) {
++						list.push_back(local.username);
++					}
++				}
++				return map(list);
++			});
++		}
+ 		return std::move(value) | rpl::map([=] {
+ 			return map(user->usernames());
+ 		});
+@@ -738,6 +756,18 @@
+ 
+ rpl::producer<BadgeType> BadgeValue(not_null<PeerData*> peer) {
+ 	if (const auto user = peer->asUser()) {
++		if (user->isSelf()) {
++			// The profile reads the server flags, so the local check is mixed in.
++			return rpl::combine(
++				BadgeValueFromFlags<UserDataFlag>(user),
++				AyuSettings::getInstance().localVerifiedValue()
++			) | rpl::map([](BadgeType type, bool verified) {
++				return (verified
++					&& (type == BadgeType::None || type == BadgeType::Premium))
++					? BadgeType::Verified
++					: type;
++			});
++		}
+ 		return BadgeValueFromFlags<UserDataFlag>(user);
+ 	} else if (const auto channel = peer->asChannel()) {
+ 		return BadgeValueFromFlags<ChannelDataFlag>(channel);
+diff --git a/Telegram/SourceFiles/window/window_session_controller.cpp b/Telegram/SourceFiles/window/window_session_controller.cpp
+--- a/Telegram/SourceFiles/window/window_session_controller.cpp
++++ b/Telegram/SourceFiles/window/window_session_controller.cpp
+@@ -132,6 +132,7 @@
+ 
+ // AyuGram includes
+ #include "ayu/ayu_settings.h"
++#include "ayu/features/local_cosmetics/local_cosmetics.h"
+ 
+ 
+ namespace Window {
+@@ -918,6 +919,24 @@
+ 		PeerId ownerId,
+ 		const QString &entity,
+ 		Fn<void(QString)> fail) {
++	if (ownerId == _session->userPeerId()) {
++		if (const auto local = AyuCosmetics::FindUsername(entity)) {
++			const auto owner = _session->data().peer(ownerId);
++			uiShow()->show(Box(Ui::CollectibleInfoBox, Ui::CollectibleInfo{
++				.entity = entity,
++				.copyText = _session->createInternalLinkFull(entity),
++				.ownerUserpic = Ui::MakeUserpicThumbnail(owner, true),
++				.ownerName = owner->name(),
++				.cryptoAmount = uint64(std::max(local->nanoTon, int64(0))),
++				.amount = uint64(std::max(local->usdCents, int64(0))),
++				.cryptoCurrency = u"TON"_q,
++				.currency = u"USD"_q,
++				.url = u"https://fragment.com/username/"_q + local->username,
++				.date = local->date,
++			}));
++			return;
++		}
++	}
+ 	if (_collectibleEntity == entity) {
+ 		return;
+ 	}
