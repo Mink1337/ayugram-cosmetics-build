@@ -108,7 +108,7 @@ jobs:
         if: steps.libs.outcome != 'success'
         shell: bash
         run: |
-          echo "::error::Libraries are not finished yet, rerun the workflow to continue from the cache."
+          echo "::error::The Libraries step failed or timed out, check its log. A timeout continues from the cache on rerun."
           exit 1
 
       - name: Generate a stub DesktopPrivate.
