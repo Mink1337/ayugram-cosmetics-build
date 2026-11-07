@@ -1,0 +1,139 @@
+# Builds AyuGram Desktop v7.2.9 with cosmetics.patch applied on top.
+# Library builds are cached between runs, so a rerun resumes after a timeout.
+name: Build AyuGram (cosmetics)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+concurrency:
+  group: build
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: windows-2022
+    timeout-minutes: 355
+    env:
+      UPSTREAM_REF: v7.2.9
+      REPO_NAME: AyuGramDesktop
+    defaults:
+      run:
+        shell: cmd
+
+    steps:
+      - name: Prepare directories.
+        run: |
+          git config --global core.autocrlf false
+          mkdir %userprofile%\TBuild\Libraries
+          mklink /d %GITHUB_WORKSPACE%\TBuild %userprofile%\TBuild
+          echo TBUILD=%GITHUB_WORKSPACE%\TBuild>>%GITHUB_ENV%
+          echo LibrariesPath=%GITHUB_WORKSPACE%\TBuild\Libraries\win64>>%GITHUB_ENV%
+
+      - name: Get the patch.
+        uses: actions/checkout@v4
+        with:
+          path: patch-repo
+
+      - name: Clone AyuGram.
+        shell: bash
+        run: |
+          git clone --depth=1 --branch "$UPSTREAM_REF" \
+            https://github.com/AyuGram/AyuGramDesktop.git "$TBUILD/$REPO_NAME"
+          cd "$TBUILD/$REPO_NAME"
+          git submodule update --init --depth=1
+
+      - name: Apply the patch.
+        shell: bash
+        run: |
+          cd "$TBUILD/$REPO_NAME"
+          git apply --whitespace=nowarn "$GITHUB_WORKSPACE/patch-repo/cosmetics.patch"
+          git status --short
+
+      - name: First set up.
+        shell: bash
+        run: |
+          DOCPATH=$TBUILD/$REPO_NAME/docs/building-win.md
+          SDK="$(grep "SDK version" $DOCPATH | sed -r 's/.*\*\*(.*)\*\* SDK version.*/\1/')"
+          echo "SDK=$SDK" >> $GITHUB_ENV
+          sed -i '/CMAKE_${lang}_FLAGS_DEBUG_INIT/s/${_Zi}//' "$PROGRAMFILES"/CMake/share/cmake*/Modules/Platform/Windows-MSVC.cmake
+          git config --global user.email "you@example.com"
+          git config --global user.name "Sample"
+
+      - uses: ilammy/msvc-dev-cmd@v1
+        name: Native Tools Command Prompt.
+        with:
+          arch: x64
+          sdk: ${{ env.SDK }}
+
+      - name: NuGet sources.
+        run: |
+          nuget sources Disable -Name "Microsoft Visual Studio Offline Packages"
+          nuget sources Add -Source https://api.nuget.org/v3/index.json & exit 0
+
+      - name: Restore the libraries cache.
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ${{ env.TBUILD }}\ThirdParty
+            ${{ env.LibrariesPath }}
+          key: libs-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: libs-
+
+      # WHY: a cold library build can take most of the 6 hour job limit, so it
+      # is stopped early and whatever finished is cached for the next run.
+      - name: Libraries.
+        id: libs
+        timeout-minutes: 240
+        continue-on-error: true
+        run: |
+          %TBUILD%\%REPO_NAME%\Telegram\build\prepare\win.bat silent
+
+      - name: Free up some disk space.
+        if: always()
+        shell: bash
+        run: find "$LibrariesPath" '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' ')' -type f ')' -o -empty ')' -delete
+
+      - name: Save the libraries cache.
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ${{ env.TBUILD }}\ThirdParty
+            ${{ env.LibrariesPath }}
+          key: libs-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Stop when the libraries are unfinished.
+        if: steps.libs.outcome != 'success'
+        shell: bash
+        run: |
+          echo "::error::Libraries are not finished yet, rerun the workflow to continue from the cache."
+          exit 1
+
+      - name: Generate a stub DesktopPrivate.
+        shell: bash
+        run: |
+          mkdir -p $TBUILD/DesktopPrivate
+          printf 'const char *PrivateKey = "";\nconst char *PrivateBetaKey = "";\n' > $TBUILD/DesktopPrivate/packer_private.h
+          printf 'static const char *AlphaPrivateKey = "";\n' > $TBUILD/DesktopPrivate/alpha_private.h
+
+      - name: Build.
+        run: |
+          cd %TBUILD%\%REPO_NAME%\Telegram
+          call configure.bat x64 ^
+          -D TDESKTOP_API_ID=2040 ^
+          -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 ^
+          -D CMAKE_CONFIGURATION_TYPES=Release ^
+          -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
+          -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+          cmake --build ..\out --config Release --target Telegram --parallel
+
+      - name: Upload the app.
+        uses: actions/upload-artifact@v4
+        with:
+          name: AyuGram-cosmetics-win64
+          path: |
+            ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out\Release\*.exe
+            ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out\Release\modules\**
+          retention-days: 14
