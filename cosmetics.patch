@@ -1,0 +1,1352 @@
+diff --git a/Telegram/CMakeLists.txt b/Telegram/CMakeLists.txt
+--- a/Telegram/CMakeLists.txt
++++ b/Telegram/CMakeLists.txt
+@@ -161,6 +161,12 @@
+         ayu/ui/settings/settings_filters.h
+         ayu/ui/settings/settings_main.cpp
+         ayu/ui/settings/settings_main.h
++        ayu/features/local_cosmetics/local_cosmetics.cpp
++        ayu/features/local_cosmetics/local_cosmetics.h
++        ayu/ui/boxes/local_nft_box.cpp
++        ayu/ui/boxes/local_nft_box.h
++        ayu/ui/settings/settings_cosmetics.cpp
++        ayu/ui/settings/settings_cosmetics.h
+         ayu/ui/settings/settings_other.cpp
+         ayu/ui/settings/settings_other.h
+         ayu/ui/settings/filters/settings_filters_list.cpp
+diff --git a/Telegram/Resources/langs/lang.strings b/Telegram/Resources/langs/lang.strings
+--- a/Telegram/Resources/langs/lang.strings
++++ b/Telegram/Resources/langs/lang.strings
+@@ -8878,6 +8878,32 @@
+ "ayu_SupportBoxReceiveBadgeInfo" = "After payment verification, you will receive a unique badge that will be displayed on your profile and visible to other users.";
+ "ayu_CrashReporting" = "Crash Reporting";
+ "ayu_CrashReportingDescription" = "When this option is enabled, you'll be prompted to send a report after the app crashes. You can decide whether to send it or not.";
++"ayu_LocalCosmetics" = "Косметика";
++"ayu_LocalCosmeticsDescription" = "Всё в этом разделе видно только в твоём клиенте, другие пользователи этого не увидят. Бейдж и галочка применятся после перезапуска.";
++"ayu_LocalBadgeHeader" = "Бейдж у ника";
++"ayu_LocalBadgeEnable" = "Показывать бейдж";
++"ayu_LocalBadgeEmoji" = "Выбрать эмодзи";
++"ayu_LocalBadgeText" = "Текст при нажатии";
++"ayu_LocalProfileHeader" = "Профиль";
++"ayu_LocalVerified" = "Галочка верификации";
++"ayu_LocalLevel" = "Уровень (0 — выключить)";
++"ayu_LocalNftHeader" = "NFT-подарки";
++"ayu_LocalNftConstructor" = "Конструктор NFT";
++"ayu_LocalNftList" = "Мои NFT";
++"ayu_LocalNftEmpty" = "Ты ещё не создал ни одного NFT.";
++"ayu_LocalNftGift" = "Подарок";
++"ayu_LocalNftModel" = "Модель";
++"ayu_LocalNftBackdrop" = "Фон";
++"ayu_LocalNftPattern" = "Узор";
++"ayu_LocalNftTitle" = "Название";
++"ayu_LocalNftNumber" = "Номер";
++"ayu_LocalNftOwner" = "Имя владельца";
++"ayu_LocalNftPreview" = "Превью";
++"ayu_LocalNftLoading" = "Загрузка…";
++"ayu_LocalNftSaved" = "NFT добавлен в твои подарки.";
++"ayu_LocalNftSelectAll" = "Дождись загрузки и выбери все параметры.";
++"ayu_LocalNftNoAttributes" = "Для этого подарка нет доступных моделей.";
++"ayu_LocalNftDeleteConfirm" = "Удалить этот NFT?";
+ "ayu_ResetSettings" = "Reset Settings";
+ "ayu_ResetSettingsConfirmation" = "Are you sure you want to reset **all** AyuGram preferences to their defaults?";
+ "ayu_DisableColorfulCover" = "Disable adaptive color";
+diff --git a/Telegram/SourceFiles/ayu/ayu_settings.cpp b/Telegram/SourceFiles/ayu/ayu_settings.cpp
+--- a/Telegram/SourceFiles/ayu/ayu_settings.cpp
++++ b/Telegram/SourceFiles/ayu/ayu_settings.cpp
+@@ -1039,6 +1039,42 @@
+ void AyuSettings::setImproveLinkPreviews(bool val) {
+ 	if (_improveLinkPreviews.current() == val) return;
+ 	_improveLinkPreviews = val;
++	save();
++}
++
++void AyuSettings::setLocalBadgeEnabled(bool val) {
++	if (_localBadgeEnabled.current() == val) return;
++	_localBadgeEnabled = val;
++	save();
++}
++
++void AyuSettings::setLocalBadgeEmojiId(uint64 val) {
++	if (_localBadgeEmojiId.current() == val) return;
++	_localBadgeEmojiId = val;
++	save();
++}
++
++void AyuSettings::setLocalBadgeText(const QString &val) {
++	if (_localBadgeText.current() == val) return;
++	_localBadgeText = val;
++	save();
++}
++
++void AyuSettings::setLocalVerified(bool val) {
++	if (_localVerified.current() == val) return;
++	_localVerified = val;
++	save();
++}
++
++void AyuSettings::setLocalRatingLevel(int val) {
++	if (_localRatingLevel.current() == val) return;
++	_localRatingLevel = val;
++	save();
++}
++
++void AyuSettings::setLocalGifts(const QString &val) {
++	if (_localGifts.current() == val) return;
++	_localGifts = val;
+ 	save();
+ }
+ 
+@@ -1165,6 +1201,12 @@
+ 		{"avatarCorners", s._avatarCorners.current()},
+ 		{"singleCornerRadius", s._singleCornerRadius.current()},
+ 		{"streamerMode", s._streamerMode.current()},
++		{"localBadgeEnabled", s._localBadgeEnabled.current()},
++		{"localBadgeEmojiId", s._localBadgeEmojiId.current()},
++		{"localBadgeText", s._localBadgeText.current()},
++		{"localVerified", s._localVerified.current()},
++		{"localRatingLevel", s._localRatingLevel.current()},
++		{"localGifts", s._localGifts.current()},
+ 		{"messageShotSettings", s._messageShotSettings}
+ 	};
+ }
+@@ -1269,6 +1311,12 @@
+ 	s._avatarCorners = j.value("avatarCorners", defaults._avatarCorners.current());
+ 	s._singleCornerRadius = j.value("singleCornerRadius", defaults._singleCornerRadius.current());
+ 	s._streamerMode = j.value("streamerMode", defaults._streamerMode.current());
++	s._localBadgeEnabled = j.value("localBadgeEnabled", defaults._localBadgeEnabled.current());
++	s._localBadgeEmojiId = j.value("localBadgeEmojiId", defaults._localBadgeEmojiId.current());
++	s._localBadgeText = j.value("localBadgeText", defaults._localBadgeText.current());
++	s._localVerified = j.value("localVerified", defaults._localVerified.current());
++	s._localRatingLevel = j.value("localRatingLevel", defaults._localRatingLevel.current());
++	s._localGifts = j.value("localGifts", defaults._localGifts.current());
+ 
+ 	if (j.contains("messageShotSettings") && j["messageShotSettings"].is_object()) {
+ 		j["messageShotSettings"].get_to(s._messageShotSettings);
+diff --git a/Telegram/SourceFiles/ayu/ayu_settings.h b/Telegram/SourceFiles/ayu/ayu_settings.h
+--- a/Telegram/SourceFiles/ayu/ayu_settings.h
++++ b/Telegram/SourceFiles/ayu/ayu_settings.h
+@@ -353,6 +353,22 @@
+ 	[[nodiscard]] int avatarCorners() const { return _avatarCorners.current(); }
+ 	[[nodiscard]] bool singleCornerRadius() const { return _singleCornerRadius.current(); }
+ 	[[nodiscard]] bool streamerMode() const { return _streamerMode.current(); }
++	[[nodiscard]] bool localBadgeEnabled() const { return _localBadgeEnabled.current(); }
++	[[nodiscard]] uint64 localBadgeEmojiId() const { return _localBadgeEmojiId.current(); }
++	[[nodiscard]] const QString &localBadgeText() const { return _localBadgeText.current(); }
++	[[nodiscard]] bool localVerified() const { return _localVerified.current(); }
++	[[nodiscard]] int localRatingLevel() const { return _localRatingLevel.current(); }
++	[[nodiscard]] const QString &localGifts() const { return _localGifts.current(); }
++
++	void setLocalBadgeEnabled(bool val);
++	void setLocalBadgeEmojiId(uint64 val);
++	void setLocalBadgeText(const QString &val);
++	void setLocalVerified(bool val);
++	void setLocalRatingLevel(int val);
++	void setLocalGifts(const QString &val);
++
++	[[nodiscard]] rpl::producer<QString> localBadgeTextValue() const { return _localBadgeText.value(); }
++	[[nodiscard]] rpl::producer<int> localRatingLevelValue() const { return _localRatingLevel.value(); }
+ 
+ 	void setSaveDeletedMessages(bool val);
+ 	void setSaveMessagesHistory(bool val);
+@@ -711,6 +727,12 @@
+ 	rpl::variable<int> _avatarCorners = 23;
+ 	rpl::variable<bool> _singleCornerRadius = false;
+ 	rpl::variable<bool> _streamerMode = false;
++	rpl::variable<bool> _localBadgeEnabled = false;
++	rpl::variable<uint64> _localBadgeEmojiId = 0;
++	rpl::variable<QString> _localBadgeText;
++	rpl::variable<bool> _localVerified = false;
++	rpl::variable<int> _localRatingLevel = 0;
++	rpl::variable<QString> _localGifts;
+ 
+ 	rpl::variable<bool> _useGlobalGhostMode = true;
+ 	std::map<uint64, std::unique_ptr<GhostModeAccountSettings>> _ghostAccounts;
+diff --git a/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.cpp b/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.cpp
+new file mode 100644
+--- /dev/null
++++ b/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.cpp
+@@ -0,0 +1,254 @@
++// This is the source code of AyuGram for Desktop.
++//
++// We do not and cannot prevent the use of our code,
++// but be respectful and credit the original author.
++//
++// Copyright @Radolyn, 2026
++#include "ayu/features/local_cosmetics/local_cosmetics.h"
++
++#include "api/api_premium.h"
++#include "apiwrap.h"
++#include "ayu/ayu_settings.h"
++#include "core/application.h"
++#include "data/data_session.h"
++#include "main/main_account.h"
++#include "main/main_domain.h"
++#include "main/main_session.h"
++
++#include <QtCore/QJsonArray>
++#include <QtCore/QJsonDocument>
++#include <QtCore/QJsonObject>
++
++namespace AyuCosmetics {
++namespace {
++
++constexpr auto kLocalIdBase = uint64(0x7A79000000000000ULL);
++constexpr auto kLocalIdMask = uint64(0xFFFF000000000000ULL);
++
++template <typename Attribute>
++[[nodiscard]] const Attribute *FindByName(
++		const std::vector<Attribute> &list,
++		const QString &name) {
++	for (const auto &attribute : list) {
++		if (attribute.name == name) {
++			return &attribute;
++		}
++	}
++	return nullptr;
++}
++
++} // namespace
++
++bool IsLocalBadgePeer(int64 bareId) {
++	if (!AyuSettings::getInstance().localBadgeEnabled()) {
++		return false;
++	}
++	for (const auto &entry : Core::App().domain().accounts()) {
++		if (entry.account->sessionExists()
++			&& int64(entry.account->session().userId().bare) == bareId) {
++			return true;
++		}
++	}
++	return false;
++}
++
++bool IsLocalGiftId(uint64 id) {
++	return (id & kLocalIdMask) == kLocalIdBase;
++}
++
++std::vector<LocalGift> LoadGifts() {
++	const auto document = QJsonDocument::fromJson(
++		AyuSettings::getInstance().localGifts().toUtf8());
++	auto result = std::vector<LocalGift>();
++	for (const auto &value : document.array()) {
++		const auto object = value.toObject();
++		result.push_back({
++			.giftId = object.value(u"giftId"_q).toString().toULongLong(),
++			.title = object.value(u"title"_q).toString(),
++			.modelName = object.value(u"model"_q).toString(),
++			.backdropName = object.value(u"backdrop"_q).toString(),
++			.patternName = object.value(u"pattern"_q).toString(),
++			.ownerName = object.value(u"owner"_q).toString(),
++			.number = object.value(u"number"_q).toInt(1),
++			.date = TimeId(object.value(u"date"_q).toInt()),
++		});
++	}
++	return result;
++}
++
++void SaveGifts(const std::vector<LocalGift> &gifts) {
++	auto array = QJsonArray();
++	for (const auto &gift : gifts) {
++		auto object = QJsonObject();
++		object.insert(u"giftId"_q, QString::number(gift.giftId));
++		object.insert(u"title"_q, gift.title);
++		object.insert(u"model"_q, gift.modelName);
++		object.insert(u"backdrop"_q, gift.backdropName);
++		object.insert(u"pattern"_q, gift.patternName);
++		object.insert(u"owner"_q, gift.ownerName);
++		object.insert(u"number"_q, gift.number);
++		object.insert(u"date"_q, int(gift.date));
++		array.push_back(object);
++	}
++	AyuSettings::getInstance().setLocalGifts(QString::fromUtf8(
++		QJsonDocument(array).toJson(QJsonDocument::Compact)));
++}
++
++int GiftsCount() {
++	return int(LoadGifts().size());
++}
++
++Data::SavedStarGift BuildSavedGift(
++		const Data::StarGift &base,
++		const Data::UniqueGiftModel &model,
++		const Data::UniqueGiftPattern &pattern,
++		const Data::UniqueGiftBackdrop &backdrop,
++		const LocalGift &gift,
++		int index) {
++	const auto id = kLocalIdBase + uint64(index) + 1;
++	// WHY: no owner id, slug or manage id, so the gift view stays read-only
++	// and never offers transfer, sale or wear actions the server would reject.
++	return Data::SavedStarGift{
++		.info = Data::StarGift{
++			.id = id,
++			.unique = std::make_shared<Data::UniqueGift>(Data::UniqueGift{
++				.id = id,
++				.initialGiftId = gift.giftId,
++				.title = gift.title,
++				.ownerName = gift.ownerName,
++				.number = gift.number,
++				.model = model,
++				.pattern = pattern,
++				.backdrop = backdrop,
++			}),
++			.document = model.document,
++			.limitedLeft = base.limitedLeft,
++			.limitedCount = base.limitedCount,
++		},
++		.date = gift.date,
++	};
++}
++
++void RequestCatalog(
++		not_null<Main::Session*> session,
++		Fn<void(std::vector<Data::StarGift>)> done,
++		Fn<void(QString)> fail) {
++	session->api().request(MTPpayments_GetStarGifts(
++		MTP_int(0)
++	)).done([=](const MTPpayments_StarGifts &result) {
++		auto gifts = std::vector<Data::StarGift>();
++		result.match([&](const MTPDpayments_starGifts &data) {
++			session->data().processUsers(data.vusers());
++			session->data().processChats(data.vchats());
++			for (const auto &gift : data.vgifts().v) {
++				if (auto parsed = Api::FromTL(session, gift)) {
++					gifts.push_back(std::move(*parsed));
++				}
++			}
++		}, [](const MTPDpayments_starGiftsNotModified &) {
++		});
++		done(std::move(gifts));
++	}).fail([=](const MTP::Error &error) {
++		fail(error.type());
++	}).send();
++}
++
++void RequestAttributes(
++		not_null<Main::Session*> session,
++		uint64 giftId,
++		Fn<void(Data::UniqueGiftAttributes)> done,
++		Fn<void(QString)> fail) {
++	session->api().request(MTPpayments_GetStarGiftUpgradeAttributes(
++		MTP_long(giftId)
++	)).done([=](const MTPpayments_StarGiftUpgradeAttributes &result) {
++		auto attributes = Data::UniqueGiftAttributes();
++		for (const auto &attribute : result.data().vattributes().v) {
++			attribute.match([&](const MTPDstarGiftAttributeModel &data) {
++				attributes.models.push_back(Api::FromTL(session, data));
++			}, [&](const MTPDstarGiftAttributePattern &data) {
++				attributes.patterns.push_back(Api::FromTL(session, data));
++			}, [&](const MTPDstarGiftAttributeBackdrop &data) {
++				attributes.backdrops.push_back(Api::FromTL(data));
++			}, [](const auto &) {
++			});
++		}
++		done(std::move(attributes));
++	}).fail([=](const MTP::Error &error) {
++		fail(error.type());
++	}).send();
++}
++
++void ResolveGifts(
++		not_null<Main::Session*> session,
++		Fn<void(std::vector<Data::SavedStarGift>)> done) {
++	const auto gifts = LoadGifts();
++	if (gifts.empty()) {
++		done({});
++		return;
++	}
++	RequestCatalog(session, [=](std::vector<Data::StarGift> catalog) {
++		struct State {
++			std::vector<Data::StarGift> catalog;
++			base::flat_map<uint64, Data::UniqueGiftAttributes> attributes;
++			int pending = 0;
++		};
++		const auto state = std::make_shared<State>();
++		state->catalog = std::move(catalog);
++
++		auto ids = base::flat_set<uint64>();
++		for (const auto &gift : gifts) {
++			ids.emplace(gift.giftId);
++		}
++		state->pending = int(ids.size());
++
++		const auto finish = [=] {
++			if (--state->pending > 0) {
++				return;
++			}
++			auto result = std::vector<Data::SavedStarGift>();
++			for (auto i = 0; i != int(gifts.size()); ++i) {
++				const auto &gift = gifts[i];
++				const auto base = ranges::find(
++					state->catalog,
++					gift.giftId,
++					&Data::StarGift::id);
++				const auto found = state->attributes.find(gift.giftId);
++				if (base == end(state->catalog)
++					|| found == end(state->attributes)) {
++					continue;
++				}
++				const auto &list = found->second;
++				const auto model = FindByName(list.models, gift.modelName);
++				const auto pattern = FindByName(
++					list.patterns,
++					gift.patternName);
++				const auto backdrop = FindByName(
++					list.backdrops,
++					gift.backdropName);
++				if (model && pattern && backdrop) {
++					result.push_back(BuildSavedGift(
++						*base,
++						*model,
++						*pattern,
++						*backdrop,
++						gift,
++						i));
++				}
++			}
++			done(std::move(result));
++		};
++		for (const auto id : ids) {
++			RequestAttributes(session, id, [=](
++					Data::UniqueGiftAttributes attributes) {
++				state->attributes.emplace(id, std::move(attributes));
++				finish();
++			}, [=](const QString &) {
++				finish();
++			});
++		}
++	}, [=](const QString &) {
++		done({});
++	});
++}
++
++} // namespace AyuCosmetics
+diff --git a/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.h b/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.h
+new file mode 100644
+--- /dev/null
++++ b/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.h
+@@ -0,0 +1,56 @@
++// This is the source code of AyuGram for Desktop.
++//
++// We do not and cannot prevent the use of our code,
++// but be respectful and credit the original author.
++//
++// Copyright @Radolyn, 2026
++#pragma once
++
++#include "data/data_star_gift.h"
++
++namespace Main {
++class Session;
++} // namespace Main
++
++namespace AyuCosmetics {
++
++struct LocalGift {
++	uint64 giftId = 0;
++	QString title;
++	QString modelName;
++	QString backdropName;
++	QString patternName;
++	QString ownerName;
++	int number = 1;
++	TimeId date = 0;
++};
++
++[[nodiscard]] bool IsLocalBadgePeer(int64 bareId);
++[[nodiscard]] bool IsLocalGiftId(uint64 id);
++
++[[nodiscard]] std::vector<LocalGift> LoadGifts();
++void SaveGifts(const std::vector<LocalGift> &gifts);
++[[nodiscard]] int GiftsCount();
++
++[[nodiscard]] Data::SavedStarGift BuildSavedGift(
++	const Data::StarGift &base,
++	const Data::UniqueGiftModel &model,
++	const Data::UniqueGiftPattern &pattern,
++	const Data::UniqueGiftBackdrop &backdrop,
++	const LocalGift &gift,
++	int index);
++
++void RequestCatalog(
++	not_null<Main::Session*> session,
++	Fn<void(std::vector<Data::StarGift>)> done,
++	Fn<void(QString)> fail);
++void RequestAttributes(
++	not_null<Main::Session*> session,
++	uint64 giftId,
++	Fn<void(Data::UniqueGiftAttributes)> done,
++	Fn<void(QString)> fail);
++void ResolveGifts(
++	not_null<Main::Session*> session,
++	Fn<void(std::vector<Data::SavedStarGift>)> done);
++
++} // namespace AyuCosmetics
+diff --git a/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.cpp b/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.cpp
+new file mode 100644
+--- /dev/null
++++ b/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.cpp
+@@ -0,0 +1,339 @@
++// This is the source code of AyuGram for Desktop.
++//
++// We do not and cannot prevent the use of our code,
++// but be respectful and credit the original author.
++//
++// Copyright @Radolyn, 2026
++#include "ayu/ui/boxes/local_nft_box.h"
++
++#include "ayu/features/local_cosmetics/local_cosmetics.h"
++#include "base/unixtime.h"
++#include "data/data_changes.h"
++#include "data/data_document.h"
++#include "data/data_user.h"
++#include "lang_auto.h"
++#include "main/main_session.h"
++#include "settings/settings_common.h"
++#include "settings/settings_credits_graphics.h"
++#include "styles/style_settings.h"
++#include "styles/style_widgets.h"
++#include "ui/boxes/confirm_box.h"
++#include "ui/layers/generic_box.h"
++#include "ui/widgets/buttons.h"
++#include "ui/widgets/fields/input_field.h"
++#include "ui/wrap/vertical_layout.h"
++#include "window/window_session_controller.h"
++
++namespace AyuCosmetics {
++namespace {
++
++constexpr auto kMaxNumber = 9999999;
++
++struct State {
++	std::vector<Data::StarGift> catalog;
++	Data::UniqueGiftAttributes attributes;
++	int gift = -1;
++	int model = -1;
++	int backdrop = -1;
++	int pattern = -1;
++	rpl::variable<QString> giftLabel;
++	rpl::variable<QString> modelLabel;
++	rpl::variable<QString> backdropLabel;
++	rpl::variable<QString> patternLabel;
++};
++
++void ChooseOptionBox(
++		not_null<Ui::GenericBox*> box,
++		QString title,
++		std::vector<QString> labels,
++		Fn<void(int)> chosen) {
++	box->setTitle(rpl::single(title));
++	for (auto i = 0; i != int(labels.size()); ++i) {
++		const auto button = Settings::AddButtonWithIcon(
++			box->verticalLayout(),
++			rpl::single(labels[i]),
++			st::settingsButtonNoIcon);
++		button->setClickedCallback([=] {
++			chosen(i);
++			box->closeBox();
++		});
++	}
++	box->addButton(tr::lng_cancel(), [=] {
++		box->closeBox();
++	});
++}
++
++[[nodiscard]] QString GiftTitle(const Data::StarGift &gift) {
++	if (!gift.resellTitle.isEmpty()) {
++		return gift.resellTitle;
++	}
++	const auto sticker = gift.document->sticker();
++	return sticker ? sticker->alt : QString::number(gift.id);
++}
++
++template <typename Attribute>
++[[nodiscard]] std::vector<QString> AttributeLabels(
++		const std::vector<Attribute> &list) {
++	auto result = std::vector<QString>();
++	result.reserve(list.size());
++	for (const auto &attribute : list) {
++		result.push_back(attribute.name
++			+ u" · "_q
++			+ Data::UniqueGiftAttributeText(attribute));
++	}
++	return result;
++}
++
++void NotifyGiftsChanged(not_null<Window::SessionController*> controller) {
++	const auto session = &controller->session();
++	session->changes().peerUpdated(
++		session->user(),
++		Data::PeerUpdate::Flag::PeerGifts);
++}
++
++} // namespace
++
++void LocalNftConstructorBox(
++		not_null<Ui::GenericBox*> box,
++		not_null<Window::SessionController*> controller) {
++	const auto session = &controller->session();
++	const auto state = box->lifetime().make_state<State>();
++	const auto container = box->verticalLayout();
++	box->setTitle(tr::ayu_LocalNftConstructor());
++
++	const auto loading = tr::ayu_LocalNftLoading(tr::now);
++	state->giftLabel = loading;
++	const auto addRow = [=](
++			rpl::producer<QString> title,
++			rpl::producer<QString> value) {
++		return Settings::AddButtonWithLabel(
++			container,
++			std::move(title),
++			std::move(value),
++			st::settingsButtonNoIcon);
++	};
++	const auto giftButton = addRow(
++		tr::ayu_LocalNftGift(),
++		state->giftLabel.value());
++	const auto modelButton = addRow(
++		tr::ayu_LocalNftModel(),
++		state->modelLabel.value());
++	const auto backdropButton = addRow(
++		tr::ayu_LocalNftBackdrop(),
++		state->backdropLabel.value());
++	const auto patternButton = addRow(
++		tr::ayu_LocalNftPattern(),
++		state->patternLabel.value());
++
++	const auto title = box->addRow(object_ptr<Ui::InputField>(
++		container,
++		st::defaultInputField,
++		tr::ayu_LocalNftTitle(),
++		QString()));
++	const auto number = box->addRow(object_ptr<Ui::InputField>(
++		container,
++		st::defaultInputField,
++		tr::ayu_LocalNftNumber(),
++		u"1"_q));
++	const auto owner = box->addRow(object_ptr<Ui::InputField>(
++		container,
++		st::defaultInputField,
++		tr::ayu_LocalNftOwner(),
++		session->user()->name()));
++
++	const auto selectModel = [=](int index) {
++		state->model = index;
++		state->modelLabel = state->attributes.models[index].name;
++	};
++	const auto selectBackdrop = [=](int index) {
++		state->backdrop = index;
++		state->backdropLabel = state->attributes.backdrops[index].name;
++	};
++	const auto selectPattern = [=](int index) {
++		state->pattern = index;
++		state->patternLabel = state->attributes.patterns[index].name;
++	};
++	const auto selectGift = [=](int index) {
++		const auto &gift = state->catalog[index];
++		state->gift = index;
++		state->model = state->backdrop = state->pattern = -1;
++		state->attributes = {};
++		state->giftLabel = GiftTitle(gift);
++		state->modelLabel = loading;
++		state->backdropLabel = loading;
++		state->patternLabel = loading;
++		title->setText(GiftTitle(gift));
++		RequestAttributes(session, gift.id, crl::guard(box, [=](
++				Data::UniqueGiftAttributes attributes) {
++			if (state->gift != index) {
++				return;
++			}
++			state->attributes = std::move(attributes);
++			const auto &list = state->attributes;
++			if (list.models.empty()
++				|| list.backdrops.empty()
++				|| list.patterns.empty()) {
++				controller->showToast(tr::ayu_LocalNftNoAttributes(tr::now));
++				return;
++			}
++			selectModel(0);
++			selectBackdrop(0);
++			selectPattern(0);
++		}), crl::guard(box, [=](const QString &error) {
++			controller->showToast(error);
++		}));
++	};
++
++	RequestCatalog(session, crl::guard(box, [=](
++			std::vector<Data::StarGift> catalog) {
++		catalog.erase(ranges::remove_if(catalog, [](
++				const Data::StarGift &gift) {
++			return !gift.upgradable && !gift.upgradeVariants;
++		}), end(catalog));
++		state->catalog = std::move(catalog);
++		if (state->catalog.empty()) {
++			state->giftLabel = QString();
++			controller->showToast(tr::ayu_LocalNftNoAttributes(tr::now));
++			return;
++		}
++		selectGift(0);
++	}), crl::guard(box, [=](const QString &error) {
++		controller->showToast(error);
++	}));
++
++	const auto choose = [=](
++			QString boxTitle,
++			std::vector<QString> labels,
++			Fn<void(int)> chosen) {
++		if (labels.empty()) {
++			return;
++		}
++		controller->show(Box(
++			ChooseOptionBox,
++			std::move(boxTitle),
++			std::move(labels),
++			std::move(chosen)));
++	};
++	giftButton->setClickedCallback([=] {
++		auto labels = std::vector<QString>();
++		labels.reserve(state->catalog.size());
++		for (const auto &gift : state->catalog) {
++			labels.push_back(GiftTitle(gift));
++		}
++		choose(
++			tr::ayu_LocalNftGift(tr::now),
++			std::move(labels),
++			selectGift);
++	});
++	modelButton->setClickedCallback([=] {
++		choose(
++			tr::ayu_LocalNftModel(tr::now),
++			AttributeLabels(state->attributes.models),
++			selectModel);
++	});
++	backdropButton->setClickedCallback([=] {
++		choose(
++			tr::ayu_LocalNftBackdrop(tr::now),
++			AttributeLabels(state->attributes.backdrops),
++			selectBackdrop);
++	});
++	patternButton->setClickedCallback([=] {
++		choose(
++			tr::ayu_LocalNftPattern(tr::now),
++			AttributeLabels(state->attributes.patterns),
++			selectPattern);
++	});
++
++	const auto ready = [=] {
++		if (state->gift >= 0
++			&& state->model >= 0
++			&& state->backdrop >= 0
++			&& state->pattern >= 0) {
++			return true;
++		}
++		controller->showToast(tr::ayu_LocalNftSelectAll(tr::now));
++		return false;
++	};
++	const auto current = [=] {
++		const auto &list = state->attributes;
++		return LocalGift{
++			.giftId = state->catalog[state->gift].id,
++			.title = title->getLastText().trimmed(),
++			.modelName = list.models[state->model].name,
++			.backdropName = list.backdrops[state->backdrop].name,
++			.patternName = list.patterns[state->pattern].name,
++			.ownerName = owner->getLastText().trimmed(),
++			.number = std::clamp(
++				number->getLastText().trimmed().toInt(),
++				1,
++				kMaxNumber),
++			.date = base::unixtime::now(),
++		};
++	};
++	box->addLeftButton(tr::ayu_LocalNftPreview(), [=] {
++		if (!ready()) {
++			return;
++		}
++		const auto &list = state->attributes;
++		Settings::ShowSavedStarGiftBox(
++			controller,
++			session->user(),
++			BuildSavedGift(
++				state->catalog[state->gift],
++				list.models[state->model],
++				list.patterns[state->pattern],
++				list.backdrops[state->backdrop],
++				current(),
++				GiftsCount()));
++	});
++	box->addButton(tr::lng_settings_save(), [=] {
++		if (!ready()) {
++			return;
++		}
++		auto gifts = LoadGifts();
++		gifts.push_back(current());
++		SaveGifts(gifts);
++		NotifyGiftsChanged(controller);
++		controller->showToast(tr::ayu_LocalNftSaved(tr::now));
++		box->closeBox();
++	});
++	box->addButton(tr::lng_cancel(), [=] {
++		box->closeBox();
++	});
++}
++
++void LocalNftListBox(
++		not_null<Ui::GenericBox*> box,
++		not_null<Window::SessionController*> controller) {
++	box->setTitle(tr::ayu_LocalNftList());
++	const auto gifts = LoadGifts();
++	for (auto i = 0; i != int(gifts.size()); ++i) {
++		const auto button = Settings::AddButtonWithIcon(
++			box->verticalLayout(),
++			rpl::single(gifts[i].title
++				+ u" #"_q
++				+ QString::number(gifts[i].number)),
++			st::settingsButtonNoIcon);
++		button->setClickedCallback([=] {
++			controller->show(Ui::MakeConfirmBox({
++				.text = tr::ayu_LocalNftDeleteConfirm(tr::rich),
++				.confirmed = [=](Fn<void()> &&close) {
++					auto now = LoadGifts();
++					if (i < int(now.size())) {
++						now.erase(begin(now) + i);
++						SaveGifts(now);
++						NotifyGiftsChanged(controller);
++					}
++					close();
++					box->closeBox();
++				},
++				.confirmText = tr::lng_box_yes(),
++			}));
++		});
++	}
++	box->addButton(tr::lng_close(), [=] {
++		box->closeBox();
++	});
++}
++
++} // namespace AyuCosmetics
+diff --git a/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.h b/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.h
+new file mode 100644
+--- /dev/null
++++ b/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.h
+@@ -0,0 +1,27 @@
++// This is the source code of AyuGram for Desktop.
++//
++// We do not and cannot prevent the use of our code,
++// but be respectful and credit the original author.
++//
++// Copyright @Radolyn, 2026
++#pragma once
++
++namespace Ui {
++class GenericBox;
++} // namespace Ui
++
++namespace Window {
++class SessionController;
++} // namespace Window
++
++namespace AyuCosmetics {
++
++void LocalNftConstructorBox(
++	not_null<Ui::GenericBox*> box,
++	not_null<Window::SessionController*> controller);
++
++void LocalNftListBox(
++	not_null<Ui::GenericBox*> box,
++	not_null<Window::SessionController*> controller);
++
++} // namespace AyuCosmetics
+diff --git a/Telegram/SourceFiles/ayu/ui/settings/settings_cosmetics.cpp b/Telegram/SourceFiles/ayu/ui/settings/settings_cosmetics.cpp
+new file mode 100644
+--- /dev/null
++++ b/Telegram/SourceFiles/ayu/ui/settings/settings_cosmetics.cpp
+@@ -0,0 +1,207 @@
++// This is the source code of AyuGram for Desktop.
++//
++// We do not and cannot prevent the use of our code,
++// but be respectful and credit the original author.
++//
++// Copyright @Radolyn, 2026
++#include "ayu/ui/settings/settings_cosmetics.h"
++
++#include "ayu/ayu_settings.h"
++#include "ayu/features/local_cosmetics/local_cosmetics.h"
++#include "ayu/ui/boxes/edit_mark_box.h"
++#include "ayu/ui/boxes/local_nft_box.h"
++#include "ayu/ui/settings/ayu_builder.h"
++#include "ayu/ui/settings/settings_ayu_utils.h"
++#include "ayu/ui/settings/settings_main.h"
++#include "boxes/abstract_box.h"
++#include "data/data_changes.h"
++#include "data/data_user.h"
++#include "info/profile/info_profile_emoji_status_panel.h"
++#include "lang_auto.h"
++#include "main/main_session.h"
++#include "settings/settings_builder.h"
++#include "settings/settings_common.h"
++#include "styles/style_menu_icons.h"
++#include "styles/style_settings.h"
++#include "ui/layers/generic_box.h"
++#include "ui/vertical_list.h"
++#include "ui/widgets/buttons.h"
++#include "ui/wrap/vertical_layout.h"
++#include "window/window_session_controller.h"
++
++namespace Settings {
++
++using namespace Builder;
++using namespace AyuBuilder;
++
++namespace {
++
++constexpr auto kMaxRatingLevel = 90;
++
++void BuildBadge(SectionBuilder &builder, AyuSectionBuilder &ayu) {
++	const auto controller = builder.controller();
++
++	builder.addSkip();
++	builder.addSubsectionTitle(tr::ayu_LocalBadgeHeader());
++	ayu.addSettingToggle({
++		.id = u"ayu/localBadge"_q,
++		.title = tr::ayu_LocalBadgeEnable(),
++		.getter = &AyuSettings::localBadgeEnabled,
++		.setter = &AyuSettings::setLocalBadgeEnabled,
++		.icon = { &st::menuIconPremium },
++	});
++	builder.add([=](const BuildContext &ctx) {
++		v::match(ctx, [&](const WidgetContext &wctx) {
++			const auto container = wctx.container;
++			const auto panel = container->lifetime().make_state<
++				Info::Profile::EmojiStatusPanel>();
++			panel->setChooseFilter([=](EmojiStatusId id) {
++				AyuSettings::getInstance().setLocalBadgeEmojiId(id.documentId);
++				panel->hideAnimated();
++				return false;
++			});
++			const auto emoji = AddButtonWithIcon(
++				container,
++				tr::ayu_LocalBadgeEmoji(),
++				st::settingsButton,
++				{ &st::menuIconPalette });
++			emoji->setClickedCallback([=] {
++				panel->show(Info::Profile::EmojiStatusPanel::Descriptor{
++					.controller = controller,
++					.button = emoji,
++				});
++			});
++			AddButtonWithLabel(
++				container,
++				tr::ayu_LocalBadgeText(),
++				AyuSettings::getInstance().localBadgeTextValue(),
++				st::settingsButton,
++				{ &st::menuIconChatBubble }
++			)->setClickedCallback([=] {
++				controller->show(Box<EditMarkBox>(
++					tr::ayu_LocalBadgeText(),
++					AyuSettings::getInstance().localBadgeText(),
++					QString(),
++					[](const QString &value) {
++						AyuSettings::getInstance().setLocalBadgeText(value);
++					}));
++			});
++		}, [&](const SearchContext &sctx) {
++			sctx.entries->push_back({
++				.id = u"ayu/localBadgeEmoji"_q,
++				.title = tr::ayu_LocalBadgeEmoji(tr::now),
++				.section = sctx.sectionId,
++			});
++		});
++	});
++	builder.addSkip();
++	builder.addDividerText(tr::ayu_LocalCosmeticsDescription());
++}
++
++void BuildProfile(SectionBuilder &builder, AyuSectionBuilder &ayu) {
++	const auto controller = builder.controller();
++
++	builder.addSkip();
++	builder.addSubsectionTitle(tr::ayu_LocalProfileHeader());
++	ayu.addSettingToggle({
++		.id = u"ayu/localVerified"_q,
++		.title = tr::ayu_LocalVerified(),
++		.getter = &AyuSettings::localVerified,
++		.setter = &AyuSettings::setLocalVerified,
++		.icon = { &st::menuIconFave },
++	});
++	builder.addButton({
++		.id = u"ayu/localLevel"_q,
++		.title = tr::ayu_LocalLevel(),
++		.icon = { &st::menuIconShowAll },
++		.label = AyuSettings::getInstance().localRatingLevelValue(
++		) | rpl::map([](int level) {
++			return level ? QString::number(level) : QString();
++		}),
++		.onClick = [=] {
++			controller->show(Box<EditMarkBox>(
++				tr::ayu_LocalLevel(),
++				QString::number(
++					AyuSettings::getInstance().localRatingLevel()),
++				u"0"_q,
++				[=](const QString &value) {
++					AyuSettings::getInstance().setLocalRatingLevel(std::clamp(
++						value.trimmed().toInt(),
++						0,
++						kMaxRatingLevel));
++					const auto session = &controller->session();
++					session->changes().peerUpdated(
++						session->user(),
++						Data::PeerUpdate::Flag::StarsRating);
++				}));
++		},
++	});
++	builder.addSkip();
++}
++
++void BuildGifts(SectionBuilder &builder) {
++	const auto controller = builder.controller();
++
++	builder.addDivider();
++	builder.addSkip();
++	builder.addSubsectionTitle(tr::ayu_LocalNftHeader());
++	builder.addButton({
++		.id = u"ayu/localNftCreate"_q,
++		.title = tr::ayu_LocalNftConstructor(),
++		.icon = { &st::menuIconPalette },
++		.onClick = [=] {
++			controller->show(Box(
++				::AyuCosmetics::LocalNftConstructorBox,
++				controller));
++		},
++	});
++	builder.addButton({
++		.id = u"ayu/localNftList"_q,
++		.title = tr::ayu_LocalNftList(),
++		.icon = { &st::menuIconTagFilter },
++		.onClick = [=] {
++			if (!::AyuCosmetics::GiftsCount()) {
++				controller->showToast(tr::ayu_LocalNftEmpty(tr::now));
++				return;
++			}
++			controller->show(Box(
++				::AyuCosmetics::LocalNftListBox,
++				controller));
++		},
++	});
++	builder.addSkip();
++}
++
++const auto kMeta = BuildHelper({
++	.id = AyuCosmetics::Id(),
++	.parentId = AyuMain::Id(),
++	.title = &tr::ayu_LocalCosmetics,
++	.icon = &st::menuIconPremium,
++}, [](SectionBuilder &builder) {
++	auto ayu = AyuSectionBuilder(builder);
++
++	BuildBadge(builder, ayu);
++	BuildProfile(builder, ayu);
++	BuildGifts(builder);
++});
++
++} // namespace
++
++rpl::producer<QString> AyuCosmetics::title() {
++	return tr::ayu_LocalCosmetics();
++}
++
++AyuCosmetics::AyuCosmetics(
++	QWidget *parent,
++	not_null<Window::SessionController*> controller)
++: Section(parent, controller) {
++	setupContent();
++}
++
++void AyuCosmetics::setupContent() {
++	const auto content = Ui::CreateChild<Ui::VerticalLayout>(this);
++	build(content, kMeta.build);
++	Ui::ResizeFitChild(this, content);
++}
++
++} // namespace Settings
+diff --git a/Telegram/SourceFiles/ayu/ui/settings/settings_cosmetics.h b/Telegram/SourceFiles/ayu/ui/settings/settings_cosmetics.h
+new file mode 100644
+--- /dev/null
++++ b/Telegram/SourceFiles/ayu/ui/settings/settings_cosmetics.h
+@@ -0,0 +1,30 @@
++// This is the source code of AyuGram for Desktop.
++//
++// We do not and cannot prevent the use of our code,
++// but be respectful and credit the original author.
++//
++// Copyright @Radolyn, 2026
++#pragma once
++
++#include "settings/settings_common.h"
++#include "settings/settings_common_session.h"
++
++namespace Window {
++class SessionController;
++} // namespace Window
++
++namespace Settings {
++
++class AyuCosmetics : public Section<AyuCosmetics> {
++public:
++	AyuCosmetics(
++		QWidget *parent,
++		not_null<Window::SessionController*> controller);
++
++	[[nodiscard]] rpl::producer<QString> title() override;
++
++private:
++	void setupContent();
++};
++
++} // namespace Settings
+diff --git a/Telegram/SourceFiles/ayu/ui/settings/settings_main.cpp b/Telegram/SourceFiles/ayu/ui/settings/settings_main.cpp
+--- a/Telegram/SourceFiles/ayu/ui/settings/settings_main.cpp
++++ b/Telegram/SourceFiles/ayu/ui/settings/settings_main.cpp
+@@ -13,6 +13,7 @@
+ #include "ayu/ui/settings/settings_appearance.h"
+ #include "ayu/ui/settings/settings_ayu.h"
+ #include "ayu/ui/settings/settings_chats.h"
++#include "ayu/ui/settings/settings_cosmetics.h"
+ #include "ayu/ui/settings/settings_filters.h"
+ #include "ayu/ui/settings/settings_general.h"
+ #include "ayu/ui/settings/settings_other.h"
+@@ -126,6 +127,11 @@
+ 		.icon = { &st::menuIconChatBubble },
+ 	});
+ 	builder.addSectionButton({
++		.title = tr::ayu_LocalCosmetics(),
++		.targetSection = AyuCosmetics::Id(),
++		.icon = { &st::menuIconPremium },
++	});
++	builder.addSectionButton({
+ 		.title = tr::ayu_CategoryOther(),
+ 		.targetSection = AyuOther::Id(),
+ 		.icon = { &st::menuIconFave },
+diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp
+--- a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp
++++ b/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp
+@@ -13,6 +13,7 @@
+ #include "ayu/ayu_state.h"
+ #include "ayu/ayu_worker.h"
+ #include "ayu/data/entities.h"
++#include "ayu/features/local_cosmetics/local_cosmetics.h"
+ #include "ayu/data/messages_storage.h"
+ #include "ayu/features/filters/filters_controller.h"
+ #include "ayu/ui/boxes/donate_info_box.h"
+@@ -181,15 +182,32 @@
+ }
+ 
+ bool isSupporterPeer(ID peerId) {
++	if (AyuCosmetics::IsLocalBadgePeer(peerId)) {
++		return true;
++	}
+ 	return RCManager::getInstance().supporters().contains(peerId) || RCManager::getInstance().supporterChannels().
+ 		contains(peerId);
+ }
+ 
+ bool isCustomBadgePeer(ID peerId) {
++	if (AyuSettings::getInstance().localBadgeEmojiId()
++		&& AyuCosmetics::IsLocalBadgePeer(peerId)) {
++		return true;
++	}
+ 	return RCManager::getInstance().supporterCustomBadges().contains(peerId);
+ }
+ 
+ CustomBadge getCustomBadge(ID peerId) {
++	const auto &settings = AyuSettings::getInstance();
++	if (settings.localBadgeEmojiId()
++		&& AyuCosmetics::IsLocalBadgePeer(peerId)) {
++		return {
++			.emojiStatusId = EmojiStatusId{
++				DocumentId(settings.localBadgeEmojiId()),
++			},
++			.text = settings.localBadgeText(),
++		};
++	}
+ 	const auto &badges = RCManager::getInstance().supporterCustomBadges();
+ 	if (const auto it = badges.find(peerId); it != badges.end()) {
+ 		return it->second;
+@@ -227,6 +245,7 @@
+ 		const auto isCustomBadge = isCustomBadgePeer(getBareID(peer));
+ 		const auto isExtera = isExteraPeer(getBareID(peer));
+ 		const auto isSupporter = isSupporterPeer(getBareID(peer));
++		const auto isLocal = AyuCosmetics::IsLocalBadgePeer(getBareID(peer));
+ 
+ 		TextWithEntities text;
+ 		if (isCustomBadge) {
+@@ -257,11 +276,14 @@
+ 						   TextWithEntities{peer->name()},
+ 						   tr::rich);
+ 		} else if (isSupporter) {
+-			text = tr::ayu_SupporterPopup(
+-				tr::now,
+-				lt_item,
+-				TextWithEntities{peer->name()},
+-				tr::rich);
++			const auto &localText = AyuSettings::getInstance().localBadgeText();
++			text = (isLocal && !localText.isEmpty())
++				? tr::rich(localText)
++				: tr::ayu_SupporterPopup(
++					tr::now,
++					lt_item,
++					TextWithEntities{peer->name()},
++					tr::rich);
+ 		} else {
+ 			return;
+ 		}
+@@ -273,7 +295,7 @@
+ 			.adaptive = true,
+ 			.duration = 3 * crl::time(1000),
+ 		};
+-		if (badge.badge == Info::Profile::BadgeType::ExteraSupporter) {
++		if (badge.badge == Info::Profile::BadgeType::ExteraSupporter && !isLocal) {
+ 			Ayu::Ui::ShowToastWithAction(
+ 				std::move(config),
+ 				tr::lng_collectible_learn_more(tr::now),
+diff --git a/Telegram/SourceFiles/data/data_user.cpp b/Telegram/SourceFiles/data/data_user.cpp
+--- a/Telegram/SourceFiles/data/data_user.cpp
++++ b/Telegram/SourceFiles/data/data_user.cpp
+@@ -41,6 +41,7 @@
+ 
+ // AyuGram includes
+ #include "ayu/ayu_settings.h"
++#include "ayu/features/local_cosmetics/local_cosmetics.h"
+ #include "ayu/utils/telegram_helpers.h"
+ 
+ 
+@@ -210,7 +211,7 @@
+ }
+ 
+ int UserData::peerGiftsCount() const {
+-	return _peerGiftsCount;
++	return _peerGiftsCount + (isSelf() ? AyuCosmetics::GiftsCount() : 0);
+ }
+ 
+ void UserData::setPeerGiftsCount(int count) {
+@@ -611,7 +612,8 @@
+ }
+ 
+ bool UserData::isVerified() const {
+-	return flags() & UserDataFlag::Verified;
++	return (flags() & UserDataFlag::Verified)
++		|| (isSelf() && AyuSettings::getInstance().localVerified());
+ }
+ 
+ bool UserData::isScam() const {
+@@ -738,6 +740,18 @@
+ }
+ 
+ Data::StarsRating UserData::starsRating() const {
++	if (isSelf()) {
++		constexpr auto kStarsPerLevel = 1000;
++		const auto level = AyuSettings::getInstance().localRatingLevel();
++		if (level > 0) {
++			return {
++				.level = level,
++				.stars = level * kStarsPerLevel + kStarsPerLevel / 2,
++				.thisLevelStars = level * kStarsPerLevel,
++				.nextLevelStars = (level + 1) * kStarsPerLevel,
++			};
++		}
++	}
+ 	return _starsRating;
+ }
+ 
+diff --git a/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp b/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp
+--- a/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp
++++ b/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp
+@@ -50,6 +50,9 @@
+ #include "styles/style_menu_icons.h"
+ #include "styles/style_credits.h" // giftBoxPadding
+ 
++// AyuGram includes
++#include "ayu/features/local_cosmetics/local_cosmetics.h"
++
+ #include <QtWidgets/QApplication>
+ 
+ namespace Info::PeerGifts {
+@@ -216,6 +219,7 @@
+ 	void loadCollections();
+ 	void loadMore();
+ 	void loaded(const MTPpayments_SavedStarGifts &result);
++	void insertLocalGifts(std::vector<Data::SavedStarGift> gifts);
+ 	void markInCollection(const Data::SavedStarGift &gift);
+ 	void refreshButtons();
+ 	void validateButtons();
+@@ -710,6 +714,7 @@
+ 		_entries->filter = filter;
+ 		_list->clear();
+ 	}
++	const auto firstPage = _list->empty();
+ 	_list->reserve(_list->size() + data.vgifts().v.size());
+ 
+ 	const auto i = ranges::find(
+@@ -743,6 +748,43 @@
+ 	if (hasUnique) {
+ 		Ui::PreloadUniqueGiftResellPrices(&_peer->session());
+ 	}
++	if (firstPage
++		&& _peer->isSelf()
++		&& !descriptor.collectionId
++		&& !_addingToCollectionId
++		&& !filter.skipUnique
++		&& !filter.skipSaved) {
++		AyuCosmetics::ResolveGifts(&_peer->session(), crl::guard(this, [=](
++				std::vector<Data::SavedStarGift> gifts) {
++			insertLocalGifts(std::move(gifts));
++		}));
++	}
++}
++
++void InnerWidget::insertLocalGifts(std::vector<Data::SavedStarGift> gifts) {
++	if (gifts.empty() || _descriptor.current().collectionId) {
++		return;
++	}
++	const auto isLocal = [](const Entry &entry) {
++		return AyuCosmetics::IsLocalGiftId(entry.gift.info.id);
++	};
++	_list->erase(ranges::remove_if(*_list, isLocal), end(*_list));
++	// Kept after the pinned gifts, markPinned relies on them being first.
++	auto position = ranges::find_if(*_list, [](const Entry &entry) {
++		return !entry.gift.pinned;
++	});
++	for (auto &gift : gifts) {
++		auto descriptor = DescriptorForGift(_peer, gift);
++		position = _list->insert(position, Entry{
++			.gift = std::move(gift),
++			.descriptor = std::move(descriptor),
++		}) + 1;
++	}
++	_entries->total = _entries->allLoaded
++		? int(_entries->list.size())
++		: (_entries->total + int(gifts.size()));
++	refreshButtons();
++	refreshAbout();
+ }
+ 
+ void InnerWidget::markInCollection(const Data::SavedStarGift &gift) {
+@@ -1178,7 +1220,8 @@
+ 		}
+ 		return -1;
+ 	}();
+-	if (index < 0) {
++	if (index < 0
++		|| AyuCosmetics::IsLocalGiftId((*_list)[index].gift.info.id)) {
+ 		return;
+ 	}
+ 
+@@ -1232,6 +1275,9 @@
+ 
+ 	if (const auto id = _addingToCollectionId) {
+ 		const auto &gift = (*_list)[index].gift;
++		if (AyuCosmetics::IsLocalGiftId(gift.info.id)) {
++			return;
++		}
+ 		auto changes = _collectionChanges.current();
+ 		const auto selected = _inCollection.contains(gift.manageId);
+ 		if (selected) {
