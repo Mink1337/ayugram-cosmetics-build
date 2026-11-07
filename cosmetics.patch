@@ -522,7 +522,7 @@ diff --git a/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.cpp b/Telegram/Sour
 new file mode 100644
 --- /dev/null
 +++ b/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.cpp
-@@ -0,0 +1,339 @@
+@@ -0,0 +1,340 @@
 +// This is the source code of AyuGram for Desktop.
 +//
 +// We do not and cannot prevent the use of our code,
@@ -536,6 +536,7 @@ new file mode 100644
 +#include "data/data_changes.h"
 +#include "data/data_document.h"
 +#include "data/data_user.h"
++#include "lang/lang_text_entity.h"
 +#include "lang_auto.h"
 +#include "main/main_session.h"
 +#include "settings/settings_common.h"
