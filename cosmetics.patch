@@ -2223,6 +2223,18 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
  			Ayu::Ui::ShowToastWithAction(
  				std::move(config),
  				tr::lng_collectible_learn_more(tr::now),
+@@ -1460,7 +1515,10 @@
+ void getUserRegistrationDate(not_null<UserData*> user, Fn<void(TextWithEntities)> callback) {
+ 	const auto session = &user->session();
+ 	const auto selfId = getDialogIdFromPeer(session->user());
+-	const auto isSupporter = isSupporterPeer(selfId) || isExteraPeer(selfId);
++	// The real lists only, a local badge gives no access to the supporter bot.
++	const auto &rc = RCManager::getInstance();
++	const auto isSupporter = rc.supporters().contains(selfId)
++		|| rc.developers().contains(selfId);
+ 
+ 	const auto botId = isSupporter ? regDateBotId : regDateBotFallbackId;
+ 	const auto botUsername = isSupporter ? regDateBotUsername : regDateBotFallbackUsername;
 diff --git a/Telegram/SourceFiles/boxes/star_gift_preview_box.cpp b/Telegram/SourceFiles/boxes/star_gift_preview_box.cpp
 --- a/Telegram/SourceFiles/boxes/star_gift_preview_box.cpp
 +++ b/Telegram/SourceFiles/boxes/star_gift_preview_box.cpp
