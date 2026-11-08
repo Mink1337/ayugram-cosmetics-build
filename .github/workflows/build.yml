@@ -150,26 +150,72 @@ jobs:
           printf 'static const char *AlphaPrivateKey = "";\n' > $TBUILD/DesktopPrivate/alpha_private.h
           touch -d '2020-01-01 00:00:00 UTC' $TBUILD/DesktopPrivate/*.h
 
-      # WHY: a normal full build takes under two hours; the limit stops a hung
-      # compiler early, and the next run continues from the saved objects.
-      - name: Build.
-        id: build
-        timeout-minutes: 170
-        continue-on-error: true
+      - name: Configure.
         run: |
+          where ninja
           cd %TBUILD%\%REPO_NAME%\Telegram
-          if exist ..\out\CMakeCache.txt goto compile
-          call configure.bat x64 ^
+          if exist ..\out\CMakeCache.txt exit /b 0
+          call configure.bat "-GNinja Multi-Config" ^
           -D TDESKTOP_API_ID=2040 ^
           -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 ^
           -D CMAKE_CONFIGURATION_TYPES=Release ^
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
-          :compile
-          cmake --build ..\out --config Release --target Telegram --parallel
+
+      # WHY: runners were lost to memory pressure with four compilers at once,
+      # and a lost runner saves nothing. Ninja keeps per-file progress, so the
+      # build runs in slices with the objects saved after each one.
+      - name: Build, part 1.
+        id: b1
+        timeout-minutes: 55
+        continue-on-error: true
+        run: cmake --build %TBUILD%\%REPO_NAME%\out --config Release --target Telegram --parallel 3
+
+      - name: Save progress 1.
+        if: steps.b1.outcome != 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out
+          key: out-${{ github.run_id }}-${{ github.run_attempt }}-1
+
+      - name: Build, part 2.
+        id: b2
+        if: steps.b1.outcome != 'success'
+        timeout-minutes: 55
+        continue-on-error: true
+        run: cmake --build %TBUILD%\%REPO_NAME%\out --config Release --target Telegram --parallel 3
+
+      - name: Save progress 2.
+        if: steps.b1.outcome != 'success' && steps.b2.outcome != 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out
+          key: out-${{ github.run_id }}-${{ github.run_attempt }}-2
+
+      - name: Build, part 3.
+        id: b3
+        if: steps.b1.outcome != 'success' && steps.b2.outcome != 'success'
+        timeout-minutes: 55
+        continue-on-error: true
+        run: cmake --build %TBUILD%\%REPO_NAME%\out --config Release --target Telegram --parallel 3
+
+      - name: Save progress 3.
+        if: steps.b1.outcome != 'success' && steps.b2.outcome != 'success' && steps.b3.outcome != 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out
+          key: out-${{ github.run_id }}-${{ github.run_attempt }}-3
+
+      - name: Build, part 4.
+        id: b4
+        if: steps.b1.outcome != 'success' && steps.b2.outcome != 'success' && steps.b3.outcome != 'success'
+        timeout-minutes: 55
+        continue-on-error: true
+        run: cmake --build %TBUILD%\%REPO_NAME%\out --config Release --target Telegram --parallel 3
 
       - name: Upload the app.
-        if: steps.build.outcome == 'success'
+        if: steps.b1.outcome == 'success' || steps.b2.outcome == 'success' || steps.b3.outcome == 'success' || steps.b4.outcome == 'success'
+        id: upload
         uses: actions/upload-artifact@v4
         with:
           name: AyuGram-cosmetics-win64
@@ -185,21 +231,21 @@ jobs:
         shell: bash
         run: |
           cd "$TBUILD/$REPO_NAME/out"
-          rm -f Release/*.pdb
-          if [ "${{ steps.build.outcome }}" = "success" ]; then
+          if [ "${{ steps.upload.outcome }}" = "success" ]; then
+            rm -f Release/*.pdb
             cp "$RUNNER_TEMP/source.sha" source.sha
           fi
           du -sh . || true
 
       - name: Save the compiled objects.
-        if: always() && steps.build.outcome != 'skipped'
+        if: always()
         uses: actions/cache/save@v4
         with:
           path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out
-          key: out-${{ github.run_id }}-${{ github.run_attempt }}
+          key: out-${{ github.run_id }}-${{ github.run_attempt }}-final
 
       - name: Report an unfinished build.
-        if: steps.build.outcome != 'success'
+        if: steps.upload.outcome != 'success'
         shell: bash
         run: |
           echo "::error::The Build step failed or timed out, check its log. A timeout continues from the cache on rerun."
