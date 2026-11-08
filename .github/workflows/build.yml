@@ -1,5 +1,6 @@
 # Builds AyuGram Desktop v7.2.9 with cosmetics.patch applied on top.
-# Library builds are cached between runs, so a rerun resumes after a timeout.
+# Libraries and compiled objects are cached between runs, so a rerun resumes
+# after a timeout and a small patch change recompiles only what it touches.
 name: Build AyuGram (cosmetics)
 
 on:
@@ -51,6 +52,34 @@ jobs:
           git apply --whitespace=nowarn "$GITHUB_WORKSPACE/patch-repo/cosmetics.patch"
           git status --short
 
+      - name: Restore the compiled objects.
+        id: objects
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out
+          key: out-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: out-
+
+      # WHY: a fresh clone gives every file a new date, which makes MSBuild
+      # recompile everything. All sources get one old date, and only files
+      # whose content differs from the last successful build get a new one.
+      - name: Normalize source dates.
+        shell: bash
+        run: |
+          cd "$TBUILD/$REPO_NAME"
+          find . -path ./out -prune -o -name .git -prune -o -type f -print0 \
+            | LC_ALL=C sort -z | xargs -0 sha1sum > "$RUNNER_TEMP/source.sha"
+          find . -path ./out -prune -o -name .git -prune -o -type f -print0 \
+            | xargs -0 touch -d '2020-01-01 00:00:00 UTC'
+          if [ -f out/source.sha ]; then
+            awk 'NR==FNR { old[substr($0, 41)] = substr($0, 1, 40); next }
+              old[substr($0, 41)] != substr($0, 1, 40) { print substr($0, 43) }' \
+              out/source.sha "$RUNNER_TEMP/source.sha" > "$RUNNER_TEMP/changed.txt"
+            echo "Changed files: $(wc -l < "$RUNNER_TEMP/changed.txt")"
+            cat "$RUNNER_TEMP/changed.txt"
+            while IFS= read -r file; do touch "$file"; done < "$RUNNER_TEMP/changed.txt"
+          fi
+
       - name: First set up.
         shell: bash
         run: |
@@ -73,6 +102,7 @@ jobs:
           nuget sources Add -Source https://api.nuget.org/v3/index.json & exit 0
 
       - name: Restore the libraries cache.
+        id: libsCache
         uses: actions/cache/restore@v4
         with:
           path: |
@@ -95,8 +125,9 @@ jobs:
         shell: bash
         run: find "$LibrariesPath" '(' '(' ! '(' -name '*.lib' -o -name '*.a' -o -name '*.exe' -o -name '*.h' -o -name '*.hpp' -o -name '*.inc' -o -name '*.cmake' -o -name '*.pc' -o -path '*/include/*' -o -path '*/objects-*' -o -path '*/cache_keys/*' -o -path '*/patches/*' -o -path '*/nv-codec-headers/*' ')' -type f ')' -o -empty ')' -delete
 
+      # An unchanged library set is already in the cache.
       - name: Save the libraries cache.
-        if: always()
+        if: always() && (steps.libs.outcome != 'success' || steps.libsCache.outputs.cache-matched-key == '')
         uses: actions/cache/save@v4
         with:
           path: |
@@ -117,19 +148,28 @@ jobs:
           mkdir -p $TBUILD/DesktopPrivate
           printf 'const char *PrivateKey = "";\nconst char *PrivateBetaKey = "";\n' > $TBUILD/DesktopPrivate/packer_private.h
           printf 'static const char *AlphaPrivateKey = "";\n' > $TBUILD/DesktopPrivate/alpha_private.h
+          touch -d '2020-01-01 00:00:00 UTC' $TBUILD/DesktopPrivate/*.h
 
+      # WHY: a normal full build takes under two hours; the limit stops a hung
+      # compiler early, and the next run continues from the saved objects.
       - name: Build.
+        id: build
+        timeout-minutes: 170
+        continue-on-error: true
         run: |
           cd %TBUILD%\%REPO_NAME%\Telegram
+          if exist ..\out\CMakeCache.txt goto compile
           call configure.bat x64 ^
           -D TDESKTOP_API_ID=2040 ^
           -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 ^
           -D CMAKE_CONFIGURATION_TYPES=Release ^
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
+          :compile
           cmake --build ..\out --config Release --target Telegram --parallel
 
       - name: Upload the app.
+        if: steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: AyuGram-cosmetics-win64
@@ -137,3 +177,30 @@ jobs:
             ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out\Release\*.exe
             ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out\Release\modules\**
           retention-days: 14
+
+      # The list of built sources is kept only after a successful build, so
+      # files left uncompiled by a failed run are compiled by the next one.
+      - name: Prepare the objects for the cache.
+        if: always()
+        shell: bash
+        run: |
+          cd "$TBUILD/$REPO_NAME/out"
+          rm -f Release/*.pdb
+          if [ "${{ steps.build.outcome }}" = "success" ]; then
+            cp "$RUNNER_TEMP/source.sha" source.sha
+          fi
+          du -sh . || true
+
+      - name: Save the compiled objects.
+        if: always() && steps.build.outcome != 'skipped'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out
+          key: out-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Report an unfinished build.
+        if: steps.build.outcome != 'success'
+        shell: bash
+        run: |
+          echo "::error::The Build step failed or timed out, check its log. A timeout continues from the cache on rerun."
+          exit 1
