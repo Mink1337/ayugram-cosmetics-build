@@ -57,8 +57,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out
-          key: out-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: out-
+          key: ninja-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: ninja-
 
       # WHY: a fresh clone gives every file a new date, which makes MSBuild
       # recompile everything. All sources get one old date, and only files
@@ -158,6 +158,7 @@ jobs:
           call configure.bat "-GNinja Multi-Config" ^
           -D TDESKTOP_API_ID=2040 ^
           -D TDESKTOP_API_HASH=b18441a1ff607e10a989891a5462e627 ^
+          -D CMAKE_OBJECT_PATH_MAX=180 ^
           -D CMAKE_CONFIGURATION_TYPES=Release ^
           -D DESKTOP_APP_DISABLE_AUTOUPDATE=ON ^
           -D DESKTOP_APP_DISABLE_CRASH_REPORTS=ON
@@ -169,49 +170,49 @@ jobs:
         id: b1
         timeout-minutes: 55
         continue-on-error: true
-        run: cmake --build %TBUILD%\%REPO_NAME%\out --config Release --target Telegram --parallel 3
+        run: cmake --build %TBUILD%\%REPO_NAME%\out --config Release --target Telegram --parallel 3 -- -k 0
 
       - name: Save progress 1.
         if: steps.b1.outcome != 'success'
         uses: actions/cache/save@v4
         with:
           path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out
-          key: out-${{ github.run_id }}-${{ github.run_attempt }}-1
+          key: ninja-${{ github.run_id }}-${{ github.run_attempt }}-1
 
       - name: Build, part 2.
         id: b2
         if: steps.b1.outcome != 'success'
         timeout-minutes: 55
         continue-on-error: true
-        run: cmake --build %TBUILD%\%REPO_NAME%\out --config Release --target Telegram --parallel 3
+        run: cmake --build %TBUILD%\%REPO_NAME%\out --config Release --target Telegram --parallel 3 -- -k 0
 
       - name: Save progress 2.
         if: steps.b1.outcome != 'success' && steps.b2.outcome != 'success'
         uses: actions/cache/save@v4
         with:
           path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out
-          key: out-${{ github.run_id }}-${{ github.run_attempt }}-2
+          key: ninja-${{ github.run_id }}-${{ github.run_attempt }}-2
 
       - name: Build, part 3.
         id: b3
         if: steps.b1.outcome != 'success' && steps.b2.outcome != 'success'
         timeout-minutes: 55
         continue-on-error: true
-        run: cmake --build %TBUILD%\%REPO_NAME%\out --config Release --target Telegram --parallel 3
+        run: cmake --build %TBUILD%\%REPO_NAME%\out --config Release --target Telegram --parallel 3 -- -k 0
 
       - name: Save progress 3.
         if: steps.b1.outcome != 'success' && steps.b2.outcome != 'success' && steps.b3.outcome != 'success'
         uses: actions/cache/save@v4
         with:
           path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out
-          key: out-${{ github.run_id }}-${{ github.run_attempt }}-3
+          key: ninja-${{ github.run_id }}-${{ github.run_attempt }}-3
 
       - name: Build, part 4.
         id: b4
         if: steps.b1.outcome != 'success' && steps.b2.outcome != 'success' && steps.b3.outcome != 'success'
         timeout-minutes: 55
         continue-on-error: true
-        run: cmake --build %TBUILD%\%REPO_NAME%\out --config Release --target Telegram --parallel 3
+        run: cmake --build %TBUILD%\%REPO_NAME%\out --config Release --target Telegram --parallel 3 -- -k 0
 
       - name: Upload the app.
         if: steps.b1.outcome == 'success' || steps.b2.outcome == 'success' || steps.b3.outcome == 'success' || steps.b4.outcome == 'success'
@@ -242,7 +243,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ env.TBUILD }}\${{ env.REPO_NAME }}\out
-          key: out-${{ github.run_id }}-${{ github.run_attempt }}-final
+          key: ninja-${{ github.run_id }}-${{ github.run_attempt }}-final
 
       - name: Report an unfinished build.
         if: steps.upload.outcome != 'success'
