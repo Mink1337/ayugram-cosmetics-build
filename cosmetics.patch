@@ -1,12 +1,14 @@
 diff --git a/Telegram/CMakeLists.txt b/Telegram/CMakeLists.txt
 --- a/Telegram/CMakeLists.txt
 +++ b/Telegram/CMakeLists.txt
-@@ -161,6 +161,12 @@
+@@ -161,6 +161,14 @@
          ayu/ui/settings/settings_filters.h
          ayu/ui/settings/settings_main.cpp
          ayu/ui/settings/settings_main.h
 +        ayu/features/local_cosmetics/local_cosmetics.cpp
 +        ayu/features/local_cosmetics/local_cosmetics.h
++        ayu/features/local_cosmetics/local_sync.cpp
++        ayu/features/local_cosmetics/local_sync.h
 +        ayu/ui/boxes/local_nft_box.cpp
 +        ayu/ui/boxes/local_nft_box.h
 +        ayu/ui/settings/settings_cosmetics.cpp
@@ -283,7 +285,7 @@ diff --git a/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.c
 new file mode 100644
 --- /dev/null
 +++ b/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.cpp
-@@ -0,0 +1,620 @@
+@@ -0,0 +1,661 @@
 +// This is the source code of AyuGram for Desktop.
 +//
 +// We do not and cannot prevent the use of our code,
@@ -295,6 +297,7 @@ new file mode 100644
 +#include "api/api_premium.h"
 +#include "apiwrap.h"
 +#include "ayu/ayu_settings.h"
++#include "ayu/features/local_cosmetics/local_sync.h"
 +#include "core/application.h"
 +#include "data/components/credits.h"
 +#include "data/data_peer.h"
@@ -414,28 +417,53 @@ new file mode 100644
 +	return IsLocalGiftId(id) ? int(id - kLocalIdBase - 1) : -1;
 +}
 +
++LocalGift GiftFromJson(const QJsonObject &object) {
++	return {
++		.giftId = object.value(u"giftId"_q).toString().toULongLong(),
++		.title = object.value(u"title"_q).toString(),
++		.modelName = object.value(u"model"_q).toString(),
++		.backdropName = object.value(u"backdrop"_q).toString(),
++		.patternName = object.value(u"pattern"_q).toString(),
++		.peerId = object.value(u"peer"_q).toString().toULongLong(),
++		.number = object.value(u"number"_q).toInt(1),
++		.date = TimeId(object.value(u"date"_q).toInt()),
++		.resaleStars = ReadInt64(object, u"stars"_q),
++		.resaleNanoTon = ReadInt64(object, u"ton"_q),
++		.issued = object.value(u"issued"_q).toInt(),
++		.total = object.value(u"total"_q).toInt(),
++		.valueCents = ReadInt64(object, u"value"_q),
++		.ownerName = object.value(u"ownerName"_q).toString(),
++		.ownerUrl = object.value(u"ownerUrl"_q).toString(),
++		.plain = object.value(u"plain"_q).toBool(),
++	};
++}
++
++QJsonObject GiftToJson(const LocalGift &gift) {
++	auto object = QJsonObject();
++	object.insert(u"giftId"_q, QString::number(gift.giftId));
++	object.insert(u"title"_q, gift.title);
++	object.insert(u"model"_q, gift.modelName);
++	object.insert(u"backdrop"_q, gift.backdropName);
++	object.insert(u"pattern"_q, gift.patternName);
++	object.insert(u"peer"_q, QString::number(gift.peerId));
++	object.insert(u"number"_q, gift.number);
++	object.insert(u"date"_q, int(gift.date));
++	object.insert(u"stars"_q, QString::number(gift.resaleStars));
++	object.insert(u"ton"_q, QString::number(gift.resaleNanoTon));
++	object.insert(u"issued"_q, gift.issued);
++	object.insert(u"total"_q, gift.total);
++	object.insert(u"value"_q, QString::number(gift.valueCents));
++	object.insert(u"ownerName"_q, gift.ownerName);
++	object.insert(u"ownerUrl"_q, gift.ownerUrl);
++	object.insert(u"plain"_q, gift.plain);
++	return object;
++}
++
 +std::vector<LocalGift> LoadGifts() {
 +	auto result = std::vector<LocalGift>();
 +	for (const auto &value : ReadArray(
 +			AyuSettings::getInstance().localGifts())) {
-+		const auto object = value.toObject();
-+		result.push_back({
-+			.giftId = object.value(u"giftId"_q).toString().toULongLong(),
-+			.title = object.value(u"title"_q).toString(),
-+			.modelName = object.value(u"model"_q).toString(),
-+			.backdropName = object.value(u"backdrop"_q).toString(),
-+			.patternName = object.value(u"pattern"_q).toString(),
-+			.peerId = object.value(u"peer"_q).toString().toULongLong(),
-+			.number = object.value(u"number"_q).toInt(1),
-+			.date = TimeId(object.value(u"date"_q).toInt()),
-+			.resaleStars = ReadInt64(object, u"stars"_q),
-+			.resaleNanoTon = ReadInt64(object, u"ton"_q),
-+			.issued = object.value(u"issued"_q).toInt(),
-+			.total = object.value(u"total"_q).toInt(),
-+			.valueCents = ReadInt64(object, u"value"_q),
-+			.ownerName = object.value(u"ownerName"_q).toString(),
-+			.ownerUrl = object.value(u"ownerUrl"_q).toString(),
-+		});
++		result.push_back(GiftFromJson(value.toObject()));
 +	}
 +	return result;
 +}
@@ -443,23 +471,7 @@ new file mode 100644
 +void SaveGifts(const std::vector<LocalGift> &gifts) {
 +	auto array = QJsonArray();
 +	for (const auto &gift : gifts) {
-+		auto object = QJsonObject();
-+		object.insert(u"giftId"_q, QString::number(gift.giftId));
-+		object.insert(u"title"_q, gift.title);
-+		object.insert(u"model"_q, gift.modelName);
-+		object.insert(u"backdrop"_q, gift.backdropName);
-+		object.insert(u"pattern"_q, gift.patternName);
-+		object.insert(u"peer"_q, QString::number(gift.peerId));
-+		object.insert(u"number"_q, gift.number);
-+		object.insert(u"date"_q, int(gift.date));
-+		object.insert(u"stars"_q, QString::number(gift.resaleStars));
-+		object.insert(u"ton"_q, QString::number(gift.resaleNanoTon));
-+		object.insert(u"issued"_q, gift.issued);
-+		object.insert(u"total"_q, gift.total);
-+		object.insert(u"value"_q, QString::number(gift.valueCents));
-+		object.insert(u"ownerName"_q, gift.ownerName);
-+		object.insert(u"ownerUrl"_q, gift.ownerUrl);
-+		array.push_back(object);
++		array.push_back(GiftToJson(gift));
 +	}
 +	AyuSettings::getInstance().setLocalGifts(WriteArray(array));
 +}
@@ -469,12 +481,14 @@ new file mode 100644
 +}
 +
 +int GiftsCountFor(not_null<const PeerData*> peer) {
-+	if (AyuSettings::getInstance().localGifts().isEmpty()) {
-+		return 0;
-+	}
-+	return int(ranges::count_if(LoadGifts(), [&](const LocalGift &gift) {
++	const auto belongs = [&](const LocalGift &gift) {
 +		return BelongsTo(gift, peer);
-+	}));
++	};
++	const auto remote = int(ranges::count_if(Sync::Gifts(), belongs));
++	if (AyuSettings::getInstance().localGifts().isEmpty()) {
++		return remote;
++	}
++	return remote + int(ranges::count_if(LoadGifts(), belongs));
 +}
 +
 +PeerId GiftOwnerId(
@@ -658,6 +672,16 @@ new file mode 100644
 +
 +} // namespace
 +
++QString StoreValue(const QString &key) {
++	return ReadStore().value(key).toString();
++}
++
++void SetStoreValue(const QString &key, const QString &value) {
++	auto store = ReadStore();
++	store.insert(key, value);
++	WriteStore(store);
++}
++
 +QString LocalPhone() {
 +	return ReadStore().value(u"phone"_q).toString();
 +}
@@ -703,6 +727,14 @@ new file mode 100644
 +			gifts.emplace_back(i, std::move(all[i]));
 +		}
 +	}
++	if (peer) {
++		auto remote = Sync::Gifts();
++		for (auto i = 0; i != int(remote.size()); ++i) {
++			if (BelongsTo(remote[i], peer)) {
++				gifts.emplace_back(kRemoteGiftIndex + i, std::move(remote[i]));
++			}
++		}
++	}
 +	if (gifts.empty()) {
 +		done({});
 +		return;
@@ -732,6 +764,17 @@ new file mode 100644
 +					state->catalog,
 +					gift.giftId,
 +					&Data::StarGift::id);
++				if (base != end(state->catalog) && gift.plain) {
++					auto info = *base;
++					info.id = kLocalIdBase + uint64(index) + 1;
++					info.unique = nullptr;
++					result.push_back(Data::SavedStarGift{
++						.info = std::move(info),
++						.fromId = session->userPeerId(),
++						.date = gift.date,
++					});
++					continue;
++				}
 +				const auto found = state->attributes.find(gift.giftId);
 +				if (base == end(state->catalog)
 +					|| found == end(state->attributes)) {
@@ -908,7 +951,7 @@ diff --git a/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.h
 new file mode 100644
 --- /dev/null
 +++ b/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.h
-@@ -0,0 +1,117 @@
+@@ -0,0 +1,128 @@
 +// This is the source code of AyuGram for Desktop.
 +//
 +// We do not and cannot prevent the use of our code,
@@ -918,6 +961,8 @@ new file mode 100644
 +#pragma once
 +
 +#include "data/data_star_gift.h"
++
++#include <QtCore/QJsonObject>
 +
 +namespace Main {
 +class Session;
@@ -949,6 +994,8 @@ new file mode 100644
 +	int64 valueCents = 0;
 +	QString ownerName;
 +	QString ownerUrl;
++	// A regular gift, without model, backdrop and pattern.
++	bool plain = false;
 +};
 +
 +struct LocalUsername {
@@ -971,6 +1018,11 @@ new file mode 100644
 +[[nodiscard]] bool IsLocalGiftId(uint64 id);
 +[[nodiscard]] int LocalGiftIndex(uint64 id);
 +
++// Gifts received from the sync server get indices from this value on.
++inline constexpr auto kRemoteGiftIndex = 1'000'000;
++
++[[nodiscard]] LocalGift GiftFromJson(const QJsonObject &object);
++[[nodiscard]] QJsonObject GiftToJson(const LocalGift &gift);
 +[[nodiscard]] std::vector<LocalGift> LoadGifts();
 +void SaveGifts(const std::vector<LocalGift> &gifts);
 +[[nodiscard]] int GiftsCount();
@@ -1009,6 +1061,8 @@ new file mode 100644
 +	Fn<void(std::vector<Data::SavedStarGift>)> done);
 +
 +// Kept in tdata/ayunft.json, so new options do not touch the shared settings.
++[[nodiscard]] QString StoreValue(const QString &key);
++void SetStoreValue(const QString &key, const QString &value);
 +[[nodiscard]] QString LocalPhone();
 +void SetLocalPhone(const QString &phone);
 +[[nodiscard]] bool FreeLocalPurchases();
@@ -1026,11 +1080,354 @@ new file mode 100644
 +void RefreshBalances();
 +
 +} // namespace AyuCosmetics
+diff --git a/Telegram/SourceFiles/ayu/features/local_cosmetics/local_sync.cpp b/Telegram/SourceFiles/ayu/features/local_cosmetics/local_sync.cpp
+new file mode 100644
+--- /dev/null
++++ b/Telegram/SourceFiles/ayu/features/local_cosmetics/local_sync.cpp
+@@ -0,0 +1,274 @@
++// This is the source code of AyuGram for Desktop.
++//
++// We do not and cannot prevent the use of our code,
++// but be respectful and credit the original author.
++//
++// Copyright @Radolyn, 2026
++#include "ayu/features/local_cosmetics/local_sync.h"
++
++#include "base/random.h"
++#include "core/application.h"
++#include "main/main_account.h"
++#include "main/main_domain.h"
++#include "main/main_session.h"
++
++#include <QtCore/QJsonArray>
++#include <QtCore/QJsonDocument>
++#include <QtCore/QTimer>
++#include <QtNetwork/QNetworkAccessManager>
++#include <QtNetwork/QNetworkReply>
++#include <QtNetwork/QNetworkRequest>
++
++namespace AyuCosmetics::Sync {
++namespace {
++
++constexpr auto kPollInterval = 60 * 1000;
++constexpr auto kFirstPollDelay = 5 * 1000;
++
++struct State {
++	std::unique_ptr<QNetworkAccessManager> manager;
++	QTimer *timer = nullptr;
++	base::flat_map<int64, RemoteBadge> badges;
++	base::flat_set<int64> verified;
++	std::vector<LocalGift> gifts;
++	rpl::event_stream<> updates;
++	QByteArray published;
++	bool polling = false;
++};
++
++[[nodiscard]] State &Instance() {
++	static auto result = State();
++	return result;
++}
++
++[[nodiscard]] QString BaseUrl() {
++	auto url = Url().trimmed();
++	while (url.endsWith('/')) {
++		url.chop(1);
++	}
++	return url;
++}
++
++[[nodiscard]] int64 SelfId() {
++	for (const auto &entry : Core::App().domain().accounts()) {
++		if (entry.account->sessionExists()) {
++			return int64(entry.account->session().userId().bare);
++		}
++	}
++	return 0;
++}
++
++[[nodiscard]] QString Token() {
++	auto token = StoreValue(u"syncToken"_q);
++	if (token.size() < 16) {
++		token = QString::number(base::RandomValue<uint64>(), 16)
++			+ QString::number(base::RandomValue<uint64>(), 16);
++		SetStoreValue(u"syncToken"_q, token);
++	}
++	return token;
++}
++
++[[nodiscard]] int64 ReadId(const QString &value) {
++	return value.toLongLong();
++}
++
++void Poll();
++
++void Send(
++		const QString &path,
++		const QJsonObject &body,
++		bool admin,
++		Fn<void(QString)> done) {
++	auto &state = Instance();
++	const auto base = BaseUrl();
++	if (!state.manager || base.isEmpty()) {
++		if (done) {
++			done(u"Не указан адрес сервера синхронизации."_q);
++		}
++		return;
++	}
++	auto request = QNetworkRequest(QUrl(base + path));
++	request.setHeader(
++		QNetworkRequest::ContentTypeHeader,
++		u"application/json"_q);
++	if (admin) {
++		request.setRawHeader("X-Admin-Key", AdminKey().toUtf8());
++	}
++	const auto reply = state.manager->post(
++		request,
++		QJsonDocument(body).toJson(QJsonDocument::Compact));
++	QObject::connect(reply, &QNetworkReply::finished, reply, [=] {
++		reply->deleteLater();
++		const auto status = reply->attribute(
++			QNetworkRequest::HttpStatusCodeAttribute).toInt();
++		const auto ok = (reply->error() == QNetworkReply::NoError)
++			&& (status >= 200 && status < 300);
++		if (done) {
++			done(ok
++				? QString()
++				: (u"Ошибка сервера "_q
++					+ QString::number(status)
++					+ u": "_q
++					+ QString::fromUtf8(reply->readAll()).left(200)));
++		}
++		if (ok && admin) {
++			Poll();
++		}
++	});
++}
++
++void Publish() {
++	auto &state = Instance();
++	const auto self = SelfId();
++	if (!self) {
++		return;
++	}
++	auto array = QJsonArray();
++	for (auto gift : LoadGifts()) {
++		if (!gift.peerId) {
++			gift.peerId = peerFromUser(UserId(uint64(self))).value;
++		}
++		array.push_back(GiftToJson(gift));
++	}
++	const auto payload = QJsonDocument(array).toJson(QJsonDocument::Compact);
++	if (payload == state.published) {
++		return;
++	}
++	auto body = QJsonObject();
++	body.insert(u"userId"_q, QString::number(self));
++	body.insert(u"token"_q, Token());
++	body.insert(u"gifts"_q, array);
++	Send(u"/gifts/publish"_q, body, false, [=](const QString &error) {
++		if (error.isEmpty()) {
++			Instance().published = payload;
++		}
++	});
++}
++
++void Apply(const QJsonObject &data) {
++	auto &state = Instance();
++	const auto self = SelfId();
++
++	state.badges.clear();
++	const auto badges = data.value(u"badges"_q).toObject();
++	for (auto i = badges.begin(); i != badges.end(); ++i) {
++		const auto object = i.value().toObject();
++		state.badges.emplace(ReadId(i.key()), RemoteBadge{
++			.style = object.value(u"style"_q).toInt(),
++			.emojiId = object.value(u"emoji"_q).toString().toULongLong(),
++			.text = object.value(u"text"_q).toString(),
++		});
++	}
++
++	state.verified.clear();
++	for (const auto &value : data.value(u"verified"_q).toArray()) {
++		state.verified.emplace(ReadId(value.toString()));
++	}
++
++	state.gifts.clear();
++	const auto gifts = data.value(u"gifts"_q).toObject();
++	for (auto i = gifts.begin(); i != gifts.end(); ++i) {
++		if (ReadId(i.key()) == self) {
++			continue;
++		}
++		for (const auto &value : i.value().toArray()) {
++			state.gifts.push_back(GiftFromJson(value.toObject()));
++		}
++	}
++	state.updates.fire({});
++}
++
++void Poll() {
++	auto &state = Instance();
++	const auto base = BaseUrl();
++	if (!state.manager || base.isEmpty() || state.polling) {
++		return;
++	}
++	state.polling = true;
++	const auto reply = state.manager->get(
++		QNetworkRequest(QUrl(base + u"/state"_q)));
++	QObject::connect(reply, &QNetworkReply::finished, reply, [=] {
++		reply->deleteLater();
++		Instance().polling = false;
++		if (reply->error() == QNetworkReply::NoError) {
++			const auto document = QJsonDocument::fromJson(reply->readAll());
++			if (document.isObject()) {
++				Apply(document.object());
++			}
++		}
++		Publish();
++	});
++}
++
++} // namespace
++
++void Start() {
++	auto &state = Instance();
++	if (state.manager) {
++		return;
++	}
++	state.manager = std::make_unique<QNetworkAccessManager>();
++	state.timer = new QTimer(state.manager.get());
++	QObject::connect(state.timer, &QTimer::timeout, [] { Poll(); });
++	state.timer->start(kPollInterval);
++	QTimer::singleShot(kFirstPollDelay, state.manager.get(), [] { Poll(); });
++}
++
++rpl::producer<> Updates() {
++	return Instance().updates.events();
++}
++
++std::optional<RemoteBadge> Badge(int64 userId) {
++	const auto &badges = Instance().badges;
++	const auto i = badges.find(userId);
++	return (i != end(badges)) ? std::make_optional(i->second) : std::nullopt;
++}
++
++bool Verified(int64 userId) {
++	return Instance().verified.contains(userId);
++}
++
++std::vector<LocalGift> Gifts() {
++	return Instance().gifts;
++}
++
++QString Url() {
++	return StoreValue(u"syncUrl"_q);
++}
++
++void SetUrl(const QString &url) {
++	SetStoreValue(u"syncUrl"_q, url.trimmed());
++	Instance().published.clear();
++	Poll();
++}
++
++QString AdminKey() {
++	return StoreValue(u"syncAdminKey"_q);
++}
++
++void SetAdminKey(const QString &key) {
++	SetStoreValue(u"syncAdminKey"_q, key.trimmed());
++}
++
++void Grant(
++		int64 userId,
++		int style,
++		uint64 emojiId,
++		const QString &text,
++		Fn<void(QString)> done) {
++	auto body = QJsonObject();
++	body.insert(u"id"_q, QString::number(userId));
++	body.insert(u"style"_q, style);
++	body.insert(u"emoji"_q, QString::number(emojiId));
++	body.insert(u"text"_q, text);
++	Send(u"/admin/badge"_q, body, true, std::move(done));
++}
++
++void SetVerified(int64 userId, bool verified, Fn<void(QString)> done) {
++	auto body = QJsonObject();
++	body.insert(u"id"_q, QString::number(userId));
++	body.insert(u"verified"_q, verified);
++	Send(u"/admin/verify"_q, body, true, std::move(done));
++}
++
++} // namespace AyuCosmetics::Sync
+diff --git a/Telegram/SourceFiles/ayu/features/local_cosmetics/local_sync.h b/Telegram/SourceFiles/ayu/features/local_cosmetics/local_sync.h
+new file mode 100644
+--- /dev/null
++++ b/Telegram/SourceFiles/ayu/features/local_cosmetics/local_sync.h
+@@ -0,0 +1,40 @@
++// This is the source code of AyuGram for Desktop.
++//
++// We do not and cannot prevent the use of our code,
++// but be respectful and credit the original author.
++//
++// Copyright @Radolyn, 2026
++#pragma once
++
++#include "ayu/features/local_cosmetics/local_cosmetics.h"
++
++namespace AyuCosmetics::Sync {
++
++struct RemoteBadge {
++	int style = 0;
++	uint64 emojiId = 0;
++	QString text;
++};
++
++void Start();
++[[nodiscard]] rpl::producer<> Updates();
++
++[[nodiscard]] std::optional<RemoteBadge> Badge(int64 userId);
++[[nodiscard]] bool Verified(int64 userId);
++[[nodiscard]] std::vector<LocalGift> Gifts();
++
++[[nodiscard]] QString Url();
++void SetUrl(const QString &url);
++[[nodiscard]] QString AdminKey();
++void SetAdminKey(const QString &key);
++
++// Both need the admin key, done gets an empty string on success.
++void Grant(
++	int64 userId,
++	int style,
++	uint64 emojiId,
++	const QString &text,
++	Fn<void(QString)> done);
++void SetVerified(int64 userId, bool verified, Fn<void(QString)> done);
++
++} // namespace AyuCosmetics::Sync
+diff --git a/Telegram/SourceFiles/ayu/ayu_infra.cpp b/Telegram/SourceFiles/ayu/ayu_infra.cpp
+--- a/Telegram/SourceFiles/ayu/ayu_infra.cpp
++++ b/Telegram/SourceFiles/ayu/ayu_infra.cpp
+@@ -16,6 +16,7 @@
+ #include "lang/lang_instance.h"
+ #include "ui/chat/chat_style_radius.h"
+ #include "utils/rc_manager.h"
++#include "ayu/features/local_cosmetics/local_sync.h"
+ 
+ #ifdef Q_OS_WIN
+ #include "ayu/utils/windows_utils.h"
+@@ -54,6 +55,7 @@
+ 
+ void initRCManager() {
+ 	RCManager::getInstance().start();
++	AyuCosmetics::Sync::Start();
+ }
+ 
+ void initTranslator() {
 diff --git a/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.cpp b/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.cpp
 new file mode 100644
 --- /dev/null
 +++ b/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.cpp
-@@ -0,0 +1,949 @@
+@@ -0,0 +1,1083 @@
 +// This is the source code of AyuGram for Desktop.
 +//
 +// We do not and cannot prevent the use of our code,
@@ -1041,6 +1438,8 @@ new file mode 100644
 +
 +#include "ayu/ayu_settings.h"
 +#include "ayu/features/local_cosmetics/local_cosmetics.h"
++#include "ayu/features/local_cosmetics/local_sync.h"
++#include "data/data_media_types.h"
 +#include "base/random.h"
 +#include "base/unixtime.h"
 +#include "history/history.h"
@@ -1236,13 +1635,47 @@ new file mode 100644
 +// Disappears after a restart, a chat keeps only what the server has.
 +void AddGiftServiceMessage(
 +		not_null<PeerData*> peer,
-+		const QString &text) {
++		const QString &text,
++		const Data::SavedStarGift *gift) {
 +	const auto history = peer->owner().history(peer);
-+	history->addNewLocalMessage(history->makeMessage({
++	const auto item = history->makeMessage({
 +		.id = history->owner().nextLocalMessageId(),
 +		.flags = MessageFlag::Local | MessageFlag::HistoryEntry,
++		.from = peer->session().userPeerId(),
 +		.date = base::unixtime::now(),
-+	}, PreparedServiceText{ { .text = text } }));
++	}, PreparedServiceText{ { .text = text } });
++	if (gift) {
++		const auto &info = gift->info;
++		item->overrideMedia(std::make_unique<Data::MediaGiftBox>(
++			item,
++			peer->session().user(),
++			Data::GiftCode{
++				.stargiftId = info.id,
++				.document = info.document,
++				.unique = info.unique,
++				.limitedCount = info.limitedCount,
++				.limitedLeft = info.limitedLeft,
++				.type = Data::GiftType::StarGift,
++			}));
++	}
++	history->addNewLocalMessage(item);
++}
++
++// The gift card in the chat, built from the saved local gift.
++void AddGiftCard(
++		not_null<Main::Session*> session,
++		not_null<PeerData*> peer,
++		int index,
++		const QString &text) {
++	ResolveAllGifts(session, [=](std::vector<Data::SavedStarGift> list) {
++		for (const auto &gift : list) {
++			if (LocalGiftIndex(gift.info.id) == index) {
++				AddGiftServiceMessage(peer, text, &gift);
++				return;
++			}
++		}
++		AddGiftServiceMessage(peer, text, nullptr);
++	});
 +}
 +
 +void GiftPickerBox(
@@ -1751,62 +2184,90 @@ new file mode 100644
 +		not_null<Window::SessionController*> controller,
 +		not_null<PeerData*> peer) {
 +	const auto session = &controller->session();
-+	const auto buy = [=](const Data::StarGift &base) {
-+		const auto price = base.stars + base.starsToUpgrade;
-+		auto &settings = AyuSettings::getInstance();
++	const auto finish = [=](LocalGift gift, int64 price) {
 +		const auto free = FreeLocalPurchases();
++		auto &settings = AyuSettings::getInstance();
 +		if (!free && settings.localStars() < price) {
 +			controller->showToast(u"Не хватает визуальных звёзд: нужно "_q
 +				+ QString::number(price));
 +			return;
 +		}
++		auto gifts = LoadGifts();
++		gifts.push_back(gift);
++		SaveGifts(gifts);
++		if (!free) {
++			settings.setLocalStars(settings.localStars() - price);
++			RefreshBalances();
++		}
++		NotifyGiftsChanged(controller, peer->id);
++		AddGiftCard(
++			session,
++			peer,
++			int(gifts.size()) - 1,
++			u"Вы подарили "_q
++				+ gift.title
++				+ (gift.plain
++					? QString()
++					: (u" #"_q + QString::number(gift.number))));
++		controller->showToast(tr::ayu_LocalNftSaved(tr::now));
++	};
++	const auto buy = [=](const Data::StarGift &base, bool unique) {
++		auto gift = LocalGift{
++			.giftId = base.id,
++			.title = GiftTitle(base),
++			.peerId = peer->isSelf() ? 0 : peer->id.value,
++			.number = 1 + int(base::RandomIndex(
++				std::max(base.limitedCount, 100000))),
++			.date = base::unixtime::now(),
++			.plain = !unique,
++		};
++		if (!unique) {
++			finish(gift, base.stars);
++			return;
++		}
++		const auto price = base.stars + base.starsToUpgrade;
 +		RequestAttributes(session, base.id, [=](
-+				Data::UniqueGiftAttributes list) {
++				Data::UniqueGiftAttributes list) mutable {
 +			if (list.models.empty()
 +				|| list.backdrops.empty()
 +				|| list.patterns.empty()) {
 +				controller->showToast(tr::ayu_LocalNftNoAttributes(tr::now));
 +				return;
 +			}
-+			const auto total = std::max(base.limitedCount, 100000);
-+			auto gift = LocalGift{
-+				.giftId = base.id,
-+				.title = GiftTitle(base),
-+				.modelName = list.models[
-+					base::RandomIndex(list.models.size())].name,
-+				.backdropName = list.backdrops[
-+					base::RandomIndex(list.backdrops.size())].name,
-+				.patternName = list.patterns[
-+					base::RandomIndex(list.patterns.size())].name,
-+				.peerId = peer->isSelf() ? 0 : peer->id.value,
-+				.number = 1 + int(base::RandomIndex(total)),
-+				.date = base::unixtime::now(),
-+			};
-+			auto gifts = LoadGifts();
-+			gifts.push_back(gift);
-+			SaveGifts(gifts);
-+			if (!free) {
-+				auto &settings = AyuSettings::getInstance();
-+				settings.setLocalStars(settings.localStars() - price);
-+				RefreshBalances();
-+			}
-+			NotifyGiftsChanged(controller, peer->id);
-+			AddGiftServiceMessage(
-+				peer,
-+				u"Вы подарили "_q
-+					+ gift.title
-+					+ u" #"_q
-+					+ QString::number(gift.number));
-+			controller->showToast(tr::ayu_LocalNftSaved(tr::now));
++			gift.modelName = list.models[
++				base::RandomIndex(list.models.size())].name;
++			gift.backdropName = list.backdrops[
++				base::RandomIndex(list.backdrops.size())].name;
++			gift.patternName = list.patterns[
++				base::RandomIndex(list.patterns.size())].name;
++			finish(gift, price);
 +		}, [=](const QString &error) {
 +			controller->showToast(error);
 +		});
 +	};
++	const auto choose = [=](const Data::StarGift &base) {
++		if (!base.upgradable && !base.upgradeVariants) {
++			buy(base, false);
++			return;
++		}
++		controller->show(Box([=](not_null<Ui::GenericBox*> box) {
++			box->setTitle(rpl::single(GiftTitle(base)));
++			box->addButton(
++				rpl::single(u"NFT · "_q
++					+ QString::number(base.stars + base.starsToUpgrade)),
++				[=] {
++					box->closeBox();
++					buy(base, true);
++				});
++			box->addButton(
++				rpl::single(u"Обычный · "_q + QString::number(base.stars)),
++				[=] {
++					box->closeBox();
++					buy(base, false);
++				});
++		}));
++	};
 +	RequestCatalog(session, [=](std::vector<Data::StarGift> catalog) {
-+		catalog.erase(ranges::remove_if(catalog, [](
-+				const Data::StarGift &gift) {
-+			return !gift.upgradable && !gift.upgradeVariants;
-+		}), end(catalog));
 +		if (catalog.empty()) {
 +			controller->showToast(tr::ayu_LocalNftNoAttributes(tr::now));
 +			return;
@@ -1818,10 +2279,78 @@ new file mode 100644
 +			controller,
 +			std::move(catalog),
 +			-1,
-+			Fn<void(int)>([=](int index) { buy((*copy)[index]); })));
++			Fn<void(int)>([=](int index) { choose((*copy)[index]); })));
 +	}, [=](const QString &error) {
 +		controller->showToast(error);
 +	});
++}
++
++void AdminBadgeBox(
++		not_null<Ui::GenericBox*> box,
++		not_null<Window::SessionController*> controller) {
++	box->setTitle(rpl::single(u"Выдать бейдж"_q));
++	const auto id = AddField(box, rpl::single(u"ID пользователя"_q), QString());
++	const auto style = AddField(
++		box,
++		rpl::single(u"0 — поддержка, 1 — разработчик, 2 — владелец"_q),
++		u"0"_q);
++	const auto text = AddField(
++		box,
++		rpl::single(u"Текст при нажатии"_q),
++		QString());
++	const auto send = [=](int value) {
++		const auto userId = id->getLastText().trimmed().toLongLong();
++		if (userId <= 0) {
++			id->showError();
++			return;
++		}
++		Sync::Grant(
++			userId,
++			value,
++			(value == 2) ? AyuSettings::getInstance().localBadgeEmojiId() : 0,
++			text->getLastText().trimmed(),
++			crl::guard(box, [=](const QString &error) {
++				controller->showToast(error.isEmpty()
++					? u"Готово, обновится у всех примерно за минуту."_q
++					: error);
++				if (error.isEmpty()) {
++					box->closeBox();
++				}
++			}));
++	};
++	box->addButton(rpl::single(u"Выдать"_q), [=] {
++		send(std::clamp(style->getLastText().trimmed().toInt(), 0, 2));
++	});
++	box->addButton(rpl::single(u"Забрать"_q), [=] {
++		send(-1);
++	});
++}
++
++void AdminVerifyBox(
++		not_null<Ui::GenericBox*> box,
++		not_null<Window::SessionController*> controller) {
++	box->setTitle(rpl::single(u"Галочка верификации"_q));
++	const auto id = AddField(box, rpl::single(u"ID пользователя"_q), QString());
++	const auto send = [=](bool verified) {
++		const auto userId = id->getLastText().trimmed().toLongLong();
++		if (userId <= 0) {
++			id->showError();
++			return;
++		}
++		Sync::SetVerified(
++			userId,
++			verified,
++			crl::guard(box, [=](const QString &error) {
++				controller->showToast(error.isEmpty()
++					? u"Готово, обновится у всех примерно за минуту."_q
++					: error);
++				if (error.isEmpty()) {
++					box->closeBox();
++				}
++			}));
++	};
++	box->addButton(rpl::single(u"Выдать"_q), [=] { send(true); });
++	box->addButton(rpl::single(u"Забрать"_q), [=] { send(false); });
 +}
 +
 +void FillLocalGiftMenu(
@@ -1840,8 +2369,10 @@ new file mode 100644
 +			SaveGifts(gifts);
 +			NotifyGiftsChanged(controller, was);
 +			NotifyGiftsChanged(controller, peer->id);
-+			AddGiftServiceMessage(
++			AddGiftCard(
++				session,
 +				peer,
++				index,
 +				u"Вы передали подарок "_q
 +					+ gifts[index].title
 +					+ u" #"_q
@@ -1984,7 +2515,7 @@ diff --git a/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.h b/Telegram/Source
 new file mode 100644
 --- /dev/null
 +++ b/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.h
-@@ -0,0 +1,44 @@
+@@ -0,0 +1,52 @@
 +// This is the source code of AyuGram for Desktop.
 +//
 +// We do not and cannot prevent the use of our code,
@@ -2024,6 +2555,14 @@ new file mode 100644
 +	not_null<Window::SessionController*> controller,
 +	not_null<PeerData*> peer);
 +
++void AdminBadgeBox(
++	not_null<Ui::GenericBox*> box,
++	not_null<Window::SessionController*> controller);
++
++void AdminVerifyBox(
++	not_null<Ui::GenericBox*> box,
++	not_null<Window::SessionController*> controller);
++
 +void LocalUsernamesBox(
 +	not_null<Ui::GenericBox*> box,
 +	not_null<Window::SessionController*> controller);
@@ -2033,7 +2572,7 @@ diff --git a/Telegram/SourceFiles/ayu/ui/settings/settings_cosmetics.cpp b/Teleg
 new file mode 100644
 --- /dev/null
 +++ b/Telegram/SourceFiles/ayu/ui/settings/settings_cosmetics.cpp
-@@ -0,0 +1,392 @@
+@@ -0,0 +1,461 @@
 +// This is the source code of AyuGram for Desktop.
 +//
 +// We do not and cannot prevent the use of our code,
@@ -2044,6 +2583,7 @@ new file mode 100644
 +
 +#include "ayu/ayu_settings.h"
 +#include "ayu/features/local_cosmetics/local_cosmetics.h"
++#include "ayu/features/local_cosmetics/local_sync.h"
 +#include "ayu/ui/boxes/edit_mark_box.h"
 +#include "ayu/ui/boxes/local_nft_box.h"
 +#include "ayu/ui/settings/ayu_builder.h"
@@ -2391,6 +2931,73 @@ new file mode 100644
 +	builder.addDividerText(tr::ayu_LocalUsernamesDescription());
 +}
 +
++void BuildSync(SectionBuilder &builder) {
++	const auto controller = builder.controller();
++	const auto owner = IsBadgeOwner(controller);
++
++	builder.addDivider();
++	builder.addSkip();
++	builder.addSubsectionTitle(rpl::single(u"Синхронизация"_q));
++	const auto url = std::make_shared<rpl::variable<QString>>(
++		::AyuCosmetics::Sync::Url());
++	builder.addButton({
++		.id = u"ayu/syncUrl"_q,
++		.title = rpl::single(u"Адрес сервера"_q),
++		.icon = { &st::menuIconLink },
++		.label = url->value(),
++		.onClick = [=] {
++			controller->show(Box<EditMarkBox>(
++				rpl::single(u"Адрес сервера синхронизации"_q),
++				url->current(),
++				QString(),
++				[=](const QString &value) {
++					*url = value.trimmed();
++					::AyuCosmetics::Sync::SetUrl(value);
++				}));
++		},
++	});
++	if (owner) {
++		builder.addButton({
++			.id = u"ayu/syncAdminKey"_q,
++			.title = rpl::single(u"Ключ администратора"_q),
++			.icon = { &st::menuIconLock },
++			.onClick = [=] {
++				controller->show(Box<EditMarkBox>(
++					rpl::single(u"Ключ администратора"_q),
++					::AyuCosmetics::Sync::AdminKey(),
++					QString(),
++					[](const QString &value) {
++						::AyuCosmetics::Sync::SetAdminKey(value);
++					}));
++			},
++		});
++		builder.addButton({
++			.id = u"ayu/syncGrantBadge"_q,
++			.title = rpl::single(u"Выдать бейдж"_q),
++			.icon = { &st::menuIconPremium },
++			.onClick = [=] {
++				controller->show(Box(
++					::AyuCosmetics::AdminBadgeBox,
++					controller));
++			},
++		});
++		builder.addButton({
++			.id = u"ayu/syncVerify"_q,
++			.title = rpl::single(u"Выдать галочку"_q),
++			.icon = { &st::menuIconFave },
++			.onClick = [=] {
++				controller->show(Box(
++					::AyuCosmetics::AdminVerifyBox,
++					controller));
++			},
++		});
++	}
++	builder.addSkip();
++	builder.addDividerText(rpl::single(owner
++		? u"Бейджи, галочки и NFT видят все пользователи этой сборки с тем же адресом сервера. Для бейджа «Владелец» берётся эмодзи, выбранное выше."_q
++		: u"Бейджи, галочки и NFT видят все пользователи этой сборки с тем же адресом сервера."_q));
++}
++
 +const auto kMeta = BuildHelper({
 +	.id = AyuCosmetics::Id(),
 +	.parentId = AyuMain::Id(),
@@ -2404,6 +3011,7 @@ new file mode 100644
 +	BuildGifts(builder);
 +	BuildBalance(builder);
 +	BuildUsernames(builder);
++	BuildSync(builder);
 +});
 +
 +} // namespace
@@ -2487,11 +3095,12 @@ diff --git a/Telegram/SourceFiles/ayu/ui/settings/settings_main.cpp b/Telegram/S
 diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp
 --- a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp
 +++ b/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp
-@@ -13,11 +13,15 @@
+@@ -13,11 +13,16 @@
  #include "ayu/ayu_state.h"
  #include "ayu/ayu_worker.h"
  #include "ayu/data/entities.h"
 +#include "ayu/features/local_cosmetics/local_cosmetics.h"
++#include "ayu/features/local_cosmetics/local_sync.h"
  #include "ayu/data/messages_storage.h"
  #include "ayu/features/filters/filters_controller.h"
  #include "ayu/ui/boxes/donate_info_box.h"
@@ -2503,7 +3112,7 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
  #include "core/core_settings.h"
  #include "core/application.h"
  #include "base/unixtime.h"
-@@ -175,21 +179,61 @@
+@@ -175,21 +180,86 @@
  	return peer->id.value & PeerId::kChatTypeMask;
  }
  
@@ -2527,10 +3136,27 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
 +	return AyuCosmetics::IsLocalBadgePeer(peerId);
 +}
 +
++[[nodiscard]] bool IsRemoteBadgeOfStyle(
++		ID peerId,
++		AyuCosmetics::BadgeStyle style) {
++	const auto remote = AyuCosmetics::Sync::Badge(peerId);
++	if (!remote || remote->style != int(style)) {
++		return false;
++	}
++	return (style != AyuCosmetics::BadgeStyle::Emoji) || remote->emojiId;
++}
++
++[[nodiscard]] bool IsBadgeOfStyle(
++		ID peerId,
++		AyuCosmetics::BadgeStyle style) {
++	return IsLocalBadgeOfStyle(peerId, style)
++		|| IsRemoteBadgeOfStyle(peerId, style);
++}
++
 +} // namespace
 +
  bool isExteraPeer(ID peerId) {
-+	if (IsLocalBadgeOfStyle(peerId, AyuCosmetics::BadgeStyle::Developer)) {
++	if (IsBadgeOfStyle(peerId, AyuCosmetics::BadgeStyle::Developer)) {
 +		return true;
 +	}
  	return RCManager::getInstance().developers().contains(peerId) || RCManager::getInstance().channels().
@@ -2538,7 +3164,7 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
  }
  
  bool isSupporterPeer(ID peerId) {
-+	if (IsLocalBadgeOfStyle(peerId, AyuCosmetics::BadgeStyle::Supporter)) {
++	if (IsBadgeOfStyle(peerId, AyuCosmetics::BadgeStyle::Supporter)) {
 +		return true;
 +	}
  	return RCManager::getInstance().supporters().contains(peerId) || RCManager::getInstance().supporterChannels().
@@ -2546,7 +3172,7 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
  }
  
  bool isCustomBadgePeer(ID peerId) {
-+	if (IsLocalBadgeOfStyle(peerId, AyuCosmetics::BadgeStyle::Emoji)) {
++	if (IsBadgeOfStyle(peerId, AyuCosmetics::BadgeStyle::Emoji)) {
 +		return true;
 +	}
  	return RCManager::getInstance().supporterCustomBadges().contains(peerId);
@@ -2554,6 +3180,14 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
  
  CustomBadge getCustomBadge(ID peerId) {
 +	const auto &settings = AyuSettings::getInstance();
++	if (!IsLocalBadgeOfStyle(peerId, AyuCosmetics::BadgeStyle::Emoji)
++		&& IsRemoteBadgeOfStyle(peerId, AyuCosmetics::BadgeStyle::Emoji)) {
++		const auto remote = AyuCosmetics::Sync::Badge(peerId);
++		return {
++			.emojiStatusId = EmojiStatusId{ DocumentId(remote->emojiId) },
++			.text = remote->text,
++		};
++	}
 +	if (IsLocalBadgeOfStyle(peerId, AyuCosmetics::BadgeStyle::Emoji)) {
 +		return {
 +			.emojiStatusId = EmojiStatusId{
@@ -2565,26 +3199,24 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
  	const auto &badges = RCManager::getInstance().supporterCustomBadges();
  	if (const auto it = badges.find(peerId); it != badges.end()) {
  		return it->second;
-@@ -217,7 +261,17 @@
+@@ -217,7 +287,15 @@
  }
  
  rpl::producer<Info::Profile::Badge::Content> ExteraBadgeTypeFromPeer(not_null<PeerData*> peer) {
 -	return rpl::single(ComputeExteraBadgeContent(peer));
-+	if (!peer->isSelf()) {
-+		return rpl::single(ComputeExteraBadgeContent(peer));
-+	}
-+	// The local badge follows its settings without a restart.
++	// Local and synced badges follow their changes without a restart.
 +	return rpl::single(
 +		rpl::empty
-+	) | rpl::then(
-+		AyuSettings::getInstance().localBadgeChanges()
-+	) | rpl::map([=] {
++	) | rpl::then(rpl::merge(
++		AyuSettings::getInstance().localBadgeChanges(),
++		AyuCosmetics::Sync::Updates()
++	)) | rpl::map([=] {
 +		return ComputeExteraBadgeContent(peer);
 +	});
  }
  
  Fn<void()> badgeClickHandler(not_null<PeerData*> peer) {
-@@ -227,6 +281,7 @@
+@@ -227,6 +305,7 @@
  		const auto isCustomBadge = isCustomBadgePeer(getBareID(peer));
  		const auto isExtera = isExteraPeer(getBareID(peer));
  		const auto isSupporter = isSupporterPeer(getBareID(peer));
@@ -2592,7 +3224,7 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
  
  		TextWithEntities text;
  		if (isCustomBadge) {
-@@ -257,13 +312,39 @@
+@@ -257,13 +336,43 @@
  						   TextWithEntities{peer->name()},
  						   tr::rich);
  		} else if (isSupporter) {
@@ -2612,9 +3244,13 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
  		} else {
  			return;
 +		}
-+		if (isLocal) {
++		const auto remote = AyuCosmetics::Sync::Badge(getBareID(peer));
++		if (!isLocal && remote && !remote->text.isEmpty()) {
++			text = tr::rich(remote->text);
++		}
++		if (isLocal || remote) {
 +			const auto &localText = AyuSettings::getInstance().localBadgeText();
-+			if (!localText.isEmpty()) {
++			if (isLocal && !localText.isEmpty()) {
 +				text = tr::rich(localText);
 +			}
 +			// A box instead of a toast, so the text can be selected and copied.
@@ -2637,7 +3273,7 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
  		}
  
  		auto config = Ui::Toast::Config{
-@@ -273,7 +354,7 @@
+@@ -273,7 +382,7 @@
  			.adaptive = true,
  			.duration = 3 * crl::time(1000),
  		};
@@ -2646,7 +3282,7 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
  			Ayu::Ui::ShowToastWithAction(
  				std::move(config),
  				tr::lng_collectible_learn_more(tr::now),
-@@ -1460,7 +1541,10 @@
+@@ -1460,7 +1569,10 @@
  void getUserRegistrationDate(not_null<UserData*> user, Fn<void(TextWithEntities)> callback) {
  	const auto session = &user->session();
  	const auto selfId = getDialogIdFromPeer(session->user());
@@ -2884,15 +3520,16 @@ diff --git a/Telegram/SourceFiles/data/components/credits.cpp b/Telegram/SourceF
 diff --git a/Telegram/SourceFiles/data/data_user.cpp b/Telegram/SourceFiles/data/data_user.cpp
 --- a/Telegram/SourceFiles/data/data_user.cpp
 +++ b/Telegram/SourceFiles/data/data_user.cpp
-@@ -41,6 +41,7 @@
+@@ -41,6 +41,8 @@
  
  // AyuGram includes
  #include "ayu/ayu_settings.h"
 +#include "ayu/features/local_cosmetics/local_cosmetics.h"
++#include "ayu/features/local_cosmetics/local_sync.h"
  #include "ayu/utils/telegram_helpers.h"
  
  
-@@ -210,7 +211,7 @@
+@@ -210,7 +212,7 @@
  }
  
  int UserData::peerGiftsCount() const {
@@ -2901,17 +3538,18 @@ diff --git a/Telegram/SourceFiles/data/data_user.cpp b/Telegram/SourceFiles/data
  }
  
  void UserData::setPeerGiftsCount(int count) {
-@@ -611,7 +612,8 @@
+@@ -611,7 +613,9 @@
  }
  
  bool UserData::isVerified() const {
 -	return flags() & UserDataFlag::Verified;
 +	return (flags() & UserDataFlag::Verified)
-+		|| (isSelf() && AyuSettings::getInstance().localVerified());
++		|| (isSelf() && AyuSettings::getInstance().localVerified())
++		|| AyuCosmetics::Sync::Verified(int64(peerToUser(id).bare));
  }
  
  bool UserData::isScam() const {
-@@ -738,6 +740,18 @@
+@@ -738,6 +742,18 @@
  }
  
  Data::StarsRating UserData::starsRating() const {
@@ -2933,19 +3571,20 @@ diff --git a/Telegram/SourceFiles/data/data_user.cpp b/Telegram/SourceFiles/data
 diff --git a/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp b/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp
 --- a/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp
 +++ b/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp
-@@ -50,6 +50,11 @@
+@@ -50,6 +50,12 @@
  #include "styles/style_menu_icons.h"
  #include "styles/style_credits.h" // giftBoxPadding
  
 +// AyuGram includes
 +#include "ayu/ayu_settings.h"
 +#include "ayu/features/local_cosmetics/local_cosmetics.h"
++#include "ayu/features/local_cosmetics/local_sync.h"
 +#include "ayu/ui/boxes/local_nft_box.h"
 +
  #include <QtWidgets/QApplication>
  
  namespace Info::PeerGifts {
-@@ -216,6 +221,8 @@
+@@ -216,6 +222,8 @@
  	void loadCollections();
  	void loadMore();
  	void loaded(const MTPpayments_SavedStarGifts &result);
@@ -2954,14 +3593,16 @@ diff --git a/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp b/T
  	void markInCollection(const Data::SavedStarGift &gift);
  	void refreshButtons();
  	void validateButtons();
-@@ -369,6 +376,17 @@
+@@ -369,6 +377,19 @@
  
  	loadCollections();
  
 +	if (_peer->isUser() && !_addingToCollectionId) {
 +		// Warms the cache, so the local gifts come with the first page.
 +		AyuCosmetics::PreloadGifts(_peer);
-+		AyuSettings::getInstance().localGiftsChanges(
++		rpl::merge(
++			AyuSettings::getInstance().localGiftsChanges() | rpl::to_empty,
++			AyuCosmetics::Sync::Updates()
 +		) | rpl::on_next([=] {
 +			if (!_list->empty() || _entries->allLoaded) {
 +				refreshLocalGifts();
@@ -2972,7 +3613,16 @@ diff --git a/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp b/T
  	_window->session().data().giftsUpdates(
  	) | rpl::on_next([=](const Data::GiftsUpdate &update) {
  		if (update.peer != _peer) {
-@@ -710,6 +728,7 @@
+@@ -685,6 +706,8 @@
+ 		_collectionsLoadedCallback = nullptr;
+ 		_entries->filter = _descriptor.current().filter;
+ 		_entries->allLoaded = true;
++		// AyuGram: local gifts are shown even when the server list fails.
++		refreshLocalGifts();
+ 	}).send();
+ }
+ 
+@@ -710,6 +733,7 @@
  		_entries->filter = filter;
  		_list->clear();
  	}
@@ -2980,7 +3630,7 @@ diff --git a/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp b/T
  	_list->reserve(_list->size() + data.vgifts().v.size());
  
  	const auto i = ranges::find(
-@@ -743,6 +762,54 @@
+@@ -743,6 +767,54 @@
  	if (hasUnique) {
  		Ui::PreloadUniqueGiftResellPrices(&_peer->session());
  	}
@@ -3035,7 +3685,7 @@ diff --git a/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp b/T
  }
  
  void InnerWidget::markInCollection(const Data::SavedStarGift &gift) {
-@@ -1180,6 +1247,14 @@
+@@ -1180,6 +1252,14 @@
  	}();
  	if (index < 0) {
  		return;
@@ -3050,7 +3700,7 @@ diff --git a/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp b/T
  	}
  
  	auto entry = ::Settings::SavedStarGiftEntry(
-@@ -1232,6 +1307,9 @@
+@@ -1232,6 +1312,9 @@
  
  	if (const auto id = _addingToCollectionId) {
  		const auto &gift = (*_list)[index].gift;
@@ -3063,18 +3713,19 @@ diff --git a/Telegram/SourceFiles/info/peer_gifts/info_peer_gifts_widget.cpp b/T
 diff --git a/Telegram/SourceFiles/info/profile/info_profile_values.cpp b/Telegram/SourceFiles/info/profile/info_profile_values.cpp
 --- a/Telegram/SourceFiles/info/profile/info_profile_values.cpp
 +++ b/Telegram/SourceFiles/info/profile/info_profile_values.cpp
-@@ -37,6 +37,10 @@
+@@ -37,6 +37,11 @@
  #include "boxes/peers/edit_peer_permissions_box.h"
  #include "base/unixtime.h"
  
 +// AyuGram includes
 +#include "ayu/ayu_settings.h"
 +#include "ayu/features/local_cosmetics/local_cosmetics.h"
++#include "ayu/features/local_cosmetics/local_sync.h"
 +
  namespace Info {
  namespace Profile {
  namespace {
-@@ -131,6 +135,12 @@
+@@ -131,6 +136,12 @@
  			user,
  			UpdateFlag::PhoneNumber) | rpl::to_empty
  	) | rpl::map([=] {
@@ -3087,7 +3738,7 @@ diff --git a/Telegram/SourceFiles/info/profile/info_profile_values.cpp b/Telegra
  		return tr::marked(Ui::FormatPhone(user->phone()));
  	});
  }
-@@ -224,6 +234,20 @@
+@@ -224,6 +235,20 @@
  		peer->session().changes().peerFlagsValue(peer, UpdateFlag::Usernames)
  	);
  	if (const auto user = peer->asUser()) {
@@ -3108,25 +3759,28 @@ diff --git a/Telegram/SourceFiles/info/profile/info_profile_values.cpp b/Telegra
  		return std::move(value) | rpl::map([=] {
  			return map(user->usernames());
  		});
-@@ -738,6 +762,18 @@
+@@ -738,7 +763,20 @@
  
  rpl::producer<BadgeType> BadgeValue(not_null<PeerData*> peer) {
  	if (const auto user = peer->asUser()) {
-+		if (user->isSelf()) {
-+			// The profile reads the server flags, so the local check is mixed in.
-+			return rpl::combine(
-+				BadgeValueFromFlags<UserDataFlag>(user),
-+				AyuSettings::getInstance().localVerifiedValue()
-+			) | rpl::map([](BadgeType type, bool verified) {
-+				return (verified
-+					&& (type == BadgeType::None || type == BadgeType::Premium))
-+					? BadgeType::Verified
-+					: type;
-+			});
-+		}
- 		return BadgeValueFromFlags<UserDataFlag>(user);
+-		return BadgeValueFromFlags<UserDataFlag>(user);
++		// The profile reads the server flags, so local and synced checks
++		// are mixed in.
++		return rpl::combine(
++			BadgeValueFromFlags<UserDataFlag>(user),
++			AyuSettings::getInstance().localVerifiedValue(),
++			rpl::single(rpl::empty) | rpl::then(AyuCosmetics::Sync::Updates())
++		) | rpl::map([=](BadgeType type, bool local, auto) {
++			const auto verified = (user->isSelf() && local)
++				|| AyuCosmetics::Sync::Verified(int64(peerToUser(user->id).bare));
++			return (verified
++				&& (type == BadgeType::None || type == BadgeType::Premium))
++				? BadgeType::Verified
++				: type;
++		});
  	} else if (const auto channel = peer->asChannel()) {
  		return BadgeValueFromFlags<ChannelDataFlag>(channel);
+ 	}
 diff --git a/Telegram/SourceFiles/window/window_session_controller.cpp b/Telegram/SourceFiles/window/window_session_controller.cpp
 --- a/Telegram/SourceFiles/window/window_session_controller.cpp
 +++ b/Telegram/SourceFiles/window/window_session_controller.cpp
