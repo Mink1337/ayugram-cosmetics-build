@@ -283,7 +283,7 @@ diff --git a/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.c
 new file mode 100644
 --- /dev/null
 +++ b/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.cpp
-@@ -0,0 +1,555 @@
+@@ -0,0 +1,620 @@
 +// This is the source code of AyuGram for Desktop.
 +//
 +// We do not and cannot prevent the use of our code,
@@ -302,7 +302,9 @@ new file mode 100644
 +#include "main/main_account.h"
 +#include "main/main_domain.h"
 +#include "main/main_session.h"
++#include "settings.h"
 +
++#include <QtCore/QFile>
 +#include <QtCore/QJsonArray>
 +#include <QtCore/QJsonDocument>
 +#include <QtCore/QJsonObject>
@@ -629,14 +631,75 @@ new file mode 100644
 +	}).send();
 +}
 +
++namespace {
++
++[[nodiscard]] QString StorePath() {
++	return cWorkingDir() + u"tdata/ayunft.json"_q;
++}
++
++[[nodiscard]] QJsonObject ReadStore() {
++	auto file = QFile(StorePath());
++	return file.open(QIODevice::ReadOnly)
++		? QJsonDocument::fromJson(file.readAll()).object()
++		: QJsonObject();
++}
++
++void WriteStore(const QJsonObject &store) {
++	auto file = QFile(StorePath());
++	if (file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
++		file.write(QJsonDocument(store).toJson(QJsonDocument::Compact));
++	}
++}
++
++void ResolveFiltered(
++		not_null<Main::Session*> session,
++		PeerData *peer,
++		Fn<void(std::vector<Data::SavedStarGift>)> done);
++
++} // namespace
++
++QString LocalPhone() {
++	return ReadStore().value(u"phone"_q).toString();
++}
++
++void SetLocalPhone(const QString &phone) {
++	auto store = ReadStore();
++	store.insert(u"phone"_q, phone);
++	WriteStore(store);
++}
++
++bool FreeLocalPurchases() {
++	return ReadStore().value(u"freePurchases"_q).toBool();
++}
++
++void SetFreeLocalPurchases(bool free) {
++	auto store = ReadStore();
++	store.insert(u"freePurchases"_q, free);
++	WriteStore(store);
++}
++
 +void ResolveGifts(
 +		not_null<PeerData*> peer,
 +		Fn<void(std::vector<Data::SavedStarGift>)> done) {
-+	const auto session = &peer->session();
++	ResolveFiltered(&peer->session(), peer.get(), std::move(done));
++}
++
++void ResolveAllGifts(
++		not_null<Main::Session*> session,
++		Fn<void(std::vector<Data::SavedStarGift>)> done) {
++	ResolveFiltered(session, nullptr, std::move(done));
++}
++
++namespace {
++
++void ResolveFiltered(
++		not_null<Main::Session*> session,
++		PeerData *peer,
++		Fn<void(std::vector<Data::SavedStarGift>)> done) {
 +	auto all = LoadGifts();
 +	auto gifts = std::vector<std::pair<int, LocalGift>>();
 +	for (auto i = 0; i != int(all.size()); ++i) {
-+		if (BelongsTo(all[i], peer.get())) {
++		if (!peer || BelongsTo(all[i], peer)) {
 +			gifts.emplace_back(i, std::move(all[i]));
 +		}
 +	}
@@ -708,6 +771,8 @@ new file mode 100644
 +		done({});
 +	});
 +}
++
++} // namespace
 +
 +void PreloadGifts(not_null<PeerData*> peer) {
 +	ResolveGifts(peer, [](std::vector<Data::SavedStarGift>) {});
@@ -843,7 +908,7 @@ diff --git a/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.h
 new file mode 100644
 --- /dev/null
 +++ b/Telegram/SourceFiles/ayu/features/local_cosmetics/local_cosmetics.h
-@@ -0,0 +1,107 @@
+@@ -0,0 +1,117 @@
 +// This is the source code of AyuGram for Desktop.
 +//
 +// We do not and cannot prevent the use of our code,
@@ -938,6 +1003,16 @@ new file mode 100644
 +	not_null<PeerData*> peer,
 +	Fn<void(std::vector<Data::SavedStarGift>)> done);
 +void PreloadGifts(not_null<PeerData*> peer);
++// Every local gift, whoever holds it, for the gallery.
++void ResolveAllGifts(
++	not_null<Main::Session*> session,
++	Fn<void(std::vector<Data::SavedStarGift>)> done);
++
++// Kept in tdata/ayunft.json, so new options do not touch the shared settings.
++[[nodiscard]] QString LocalPhone();
++void SetLocalPhone(const QString &phone);
++[[nodiscard]] bool FreeLocalPurchases();
++void SetFreeLocalPurchases(bool free);
 +
 +[[nodiscard]] std::vector<LocalUsername> LoadUsernames();
 +void SaveUsernames(const std::vector<LocalUsername> &usernames);
@@ -955,7 +1030,7 @@ diff --git a/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.cpp b/Telegram/Sour
 new file mode 100644
 --- /dev/null
 +++ b/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.cpp
-@@ -0,0 +1,833 @@
+@@ -0,0 +1,949 @@
 +// This is the source code of AyuGram for Desktop.
 +//
 +// We do not and cannot prevent the use of our code,
@@ -964,8 +1039,13 @@ new file mode 100644
 +// Copyright @Radolyn, 2026
 +#include "ayu/ui/boxes/local_nft_box.h"
 +
++#include "ayu/ayu_settings.h"
 +#include "ayu/features/local_cosmetics/local_cosmetics.h"
++#include "base/random.h"
 +#include "base/unixtime.h"
++#include "history/history.h"
++#include "history/history_item.h"
++#include "history/history_item_helpers.h"
 +#include "boxes/peer_list_box.h"
 +#include "boxes/peer_list_controllers.h"
 +#include "boxes/star_gift_cover_box.h"
@@ -1121,6 +1201,50 @@ new file mode 100644
 +		value));
 +}
 +
++void LayoutGiftGrid(
++		not_null<Ui::RpWidget*> gifts,
++		not_null<Info::PeerGifts::Delegate*> delegate,
++		not_null<const std::vector<not_null<GiftButton*>>*> buttons) {
++	gifts->widthValue() | rpl::on_next([=](int width) {
++		const auto singleMin = delegate->buttonSize();
++		if (width < singleMin.width()) {
++			return;
++		}
++		const auto count = int(buttons->size());
++		const auto skipw = st::giftBoxGiftSkip.x();
++		const auto skiph = st::giftBoxGiftSkip.y();
++		const auto perRow = (width + skipw) / (singleMin.width() + skipw);
++		if (perRow <= 0) {
++			return;
++		}
++		const auto single = (width - (perRow - 1) * skipw) / perRow;
++		const auto height = singleMin.height();
++		const auto rows = (count + perRow - 1) / perRow;
++		for (auto index = 0; index != count; ++index) {
++			(*buttons)[index]->setGeometry(
++				QRect(
++					(index % perRow) * (single + skipw),
++					(index / perRow) * (height + skiph),
++					single,
++					height),
++				delegate->buttonExtend());
++		}
++		gifts->resize(width, std::max(rows * (height + skiph) - skiph, 0));
++	}, gifts->lifetime());
++}
++
++// Disappears after a restart, a chat keeps only what the server has.
++void AddGiftServiceMessage(
++		not_null<PeerData*> peer,
++		const QString &text) {
++	const auto history = peer->owner().history(peer);
++	history->addNewLocalMessage(history->makeMessage({
++		.id = history->owner().nextLocalMessageId(),
++		.flags = MessageFlag::Local | MessageFlag::HistoryEntry,
++		.date = base::unixtime::now(),
++	}, PreparedServiceText{ { .text = text } }));
++}
++
 +void GiftPickerBox(
 +		not_null<Ui::GenericBox*> box,
 +		not_null<Window::SessionController*> controller,
@@ -1164,36 +1288,7 @@ new file mode 100644
 +		});
 +	}
 +
-+	gifts->widthValue() | rpl::on_next([=](int width) {
-+		const auto singleMin = state->delegate.buttonSize();
-+		if (width < singleMin.width()) {
-+			return;
-+		}
-+		const auto count = int(state->buttons.size());
-+		const auto skipw = st::giftBoxGiftSkip.x();
-+		const auto skiph = st::giftBoxGiftSkip.y();
-+		const auto perRow = std::min(
-+			(width + skipw) / (singleMin.width() + skipw),
-+			std::max(count, 1));
-+		if (perRow <= 0) {
-+			return;
-+		}
-+		const auto single = (width - (perRow - 1) * skipw) / perRow;
-+		const auto height = singleMin.height();
-+		const auto rows = (count + perRow - 1) / perRow;
-+		for (auto index = 0; index != count; ++index) {
-+			const auto row = index / perRow;
-+			const auto column = index % perRow;
-+			state->buttons[index]->setGeometry(
-+				QRect(
-+					column * (single + skipw),
-+					row * (height + skiph),
-+					single,
-+					height),
-+				state->delegate.buttonExtend());
-+		}
-+		gifts->resize(width, std::max(rows * (height + skiph) - skiph, 0));
-+	}, gifts->lifetime());
++	LayoutGiftGrid(gifts, &state->delegate, &state->buttons);
 +
 +	box->addButton(tr::lng_cancel(), [=] {
 +		box->closeBox();
@@ -1609,33 +1704,123 @@ new file mode 100644
 +void LocalNftListBox(
 +		not_null<Ui::GenericBox*> box,
 +		not_null<Window::SessionController*> controller) {
++	struct State {
++		explicit State(not_null<Main::Session*> session)
++		: delegate(session, GiftButtonMode::Minimal) {
++		}
++
++		Info::PeerGifts::Delegate delegate;
++		std::vector<not_null<GiftButton*>> buttons;
++	};
 +	const auto session = &controller->session();
++	const auto state = box->lifetime().make_state<State>(session);
 +	box->setTitle(tr::ayu_LocalNftList());
-+	const auto gifts = LoadGifts();
-+	for (auto i = 0; i != int(gifts.size()); ++i) {
-+		const auto &gift = gifts[i];
-+		const auto owner = GiftOwnerId(session, gift);
-+		const auto label = (owner == session->userPeerId())
-+			? QString()
-+			: session->data().peer(owner)->name();
-+		const auto button = Settings::AddButtonWithLabel(
-+			box->verticalLayout(),
-+			rpl::single(gift.title
-+				+ u" #"_q
-+				+ QString::number(gift.number)),
-+			rpl::single(label),
-+			st::settingsButtonNoIcon);
-+		button->setClickedCallback([=] {
-+			box->closeBox();
-+			controller->show(Box(
-+				LocalNftConstructorBox,
-+				controller,
-+				i,
-+				(PeerData*)nullptr));
-+		});
-+	}
++	box->setWidth(st::boxWideWidth);
++	const auto gifts = box->addRow(
++		object_ptr<Ui::RpWidget>(box),
++		QMargins(
++			st::giftBoxPadding.left(),
++			st::giftBoxPadding.top(),
++			st::giftBoxPadding.right(),
++			st::giftBoxPadding.bottom()));
++	ResolveAllGifts(session, crl::guard(box, [=](
++			std::vector<Data::SavedStarGift> list) {
++		for (const auto &gift : list) {
++			state->buttons.push_back(
++				Ui::CreateChild<GiftButton>(gifts, &state->delegate));
++			const auto button = state->buttons.back();
++			button->setDescriptor(GiftTypeStars{
++				.info = gift.info,
++				.mine = true,
++			}, GiftButton::Mode::Minimal);
++			button->show();
++			button->setClickedCallback([=] {
++				const auto owner = session->data().peer(
++					gift.info.unique->ownerId);
++				Settings::ShowSavedStarGiftBox(controller, owner, gift);
++			});
++		}
++		LayoutGiftGrid(gifts, &state->delegate, &state->buttons);
++	}));
 +	box->addButton(tr::lng_close(), [=] {
 +		box->closeBox();
++	});
++}
++
++void ShowBuyLocalGift(
++		not_null<Window::SessionController*> controller,
++		not_null<PeerData*> peer) {
++	const auto session = &controller->session();
++	const auto buy = [=](const Data::StarGift &base) {
++		const auto price = base.stars + base.starsToUpgrade;
++		auto &settings = AyuSettings::getInstance();
++		const auto free = FreeLocalPurchases();
++		if (!free && settings.localStars() < price) {
++			controller->showToast(u"Не хватает визуальных звёзд: нужно "_q
++				+ QString::number(price));
++			return;
++		}
++		RequestAttributes(session, base.id, [=](
++				Data::UniqueGiftAttributes list) {
++			if (list.models.empty()
++				|| list.backdrops.empty()
++				|| list.patterns.empty()) {
++				controller->showToast(tr::ayu_LocalNftNoAttributes(tr::now));
++				return;
++			}
++			const auto total = std::max(base.limitedCount, 100000);
++			auto gift = LocalGift{
++				.giftId = base.id,
++				.title = GiftTitle(base),
++				.modelName = list.models[
++					base::RandomIndex(list.models.size())].name,
++				.backdropName = list.backdrops[
++					base::RandomIndex(list.backdrops.size())].name,
++				.patternName = list.patterns[
++					base::RandomIndex(list.patterns.size())].name,
++				.peerId = peer->isSelf() ? 0 : peer->id.value,
++				.number = 1 + int(base::RandomIndex(total)),
++				.date = base::unixtime::now(),
++			};
++			auto gifts = LoadGifts();
++			gifts.push_back(gift);
++			SaveGifts(gifts);
++			if (!free) {
++				auto &settings = AyuSettings::getInstance();
++				settings.setLocalStars(settings.localStars() - price);
++				RefreshBalances();
++			}
++			NotifyGiftsChanged(controller, peer->id);
++			AddGiftServiceMessage(
++				peer,
++				u"Вы подарили "_q
++					+ gift.title
++					+ u" #"_q
++					+ QString::number(gift.number));
++			controller->showToast(tr::ayu_LocalNftSaved(tr::now));
++		}, [=](const QString &error) {
++			controller->showToast(error);
++		});
++	};
++	RequestCatalog(session, [=](std::vector<Data::StarGift> catalog) {
++		catalog.erase(ranges::remove_if(catalog, [](
++				const Data::StarGift &gift) {
++			return !gift.upgradable && !gift.upgradeVariants;
++		}), end(catalog));
++		if (catalog.empty()) {
++			controller->showToast(tr::ayu_LocalNftNoAttributes(tr::now));
++			return;
++		}
++		const auto copy = std::make_shared<std::vector<Data::StarGift>>(
++			catalog);
++		controller->show(Box(
++			GiftPickerBox,
++			controller,
++			std::move(catalog),
++			-1,
++			Fn<void(int)>([=](int index) { buy((*copy)[index]); })));
++	}, [=](const QString &error) {
++		controller->showToast(error);
 +	});
 +}
 +
@@ -1655,6 +1840,12 @@ new file mode 100644
 +			SaveGifts(gifts);
 +			NotifyGiftsChanged(controller, was);
 +			NotifyGiftsChanged(controller, peer->id);
++			AddGiftServiceMessage(
++				peer,
++				u"Вы передали подарок "_q
++					+ gifts[index].title
++					+ u" #"_q
++					+ QString::number(gifts[index].number));
 +			controller->showToast(u"Подарок передан."_q);
 +		});
 +	}, &st::menuIconReplace);
@@ -1793,7 +1984,7 @@ diff --git a/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.h b/Telegram/Source
 new file mode 100644
 --- /dev/null
 +++ b/Telegram/SourceFiles/ayu/ui/boxes/local_nft_box.h
-@@ -0,0 +1,40 @@
+@@ -0,0 +1,44 @@
 +// This is the source code of AyuGram for Desktop.
 +//
 +// We do not and cannot prevent the use of our code,
@@ -1829,6 +2020,10 @@ new file mode 100644
 +	not_null<Window::SessionController*> controller,
 +	int index);
 +
++void ShowBuyLocalGift(
++	not_null<Window::SessionController*> controller,
++	not_null<PeerData*> peer);
++
 +void LocalUsernamesBox(
 +	not_null<Ui::GenericBox*> box,
 +	not_null<Window::SessionController*> controller);
@@ -1838,7 +2033,7 @@ diff --git a/Telegram/SourceFiles/ayu/ui/settings/settings_cosmetics.cpp b/Teleg
 new file mode 100644
 --- /dev/null
 +++ b/Telegram/SourceFiles/ayu/ui/settings/settings_cosmetics.cpp
-@@ -0,0 +1,351 @@
+@@ -0,0 +1,392 @@
 +// This is the source code of AyuGram for Desktop.
 +//
 +// We do not and cannot prevent the use of our code,
@@ -1869,6 +2064,8 @@ new file mode 100644
 +#include "ui/widgets/buttons.h"
 +#include "ui/wrap/vertical_layout.h"
 +#include "window/window_session_controller.h"
++
++#include <QtCore/QRegularExpression>
 +
 +namespace Settings {
 +
@@ -2124,6 +2321,45 @@ new file mode 100644
 +						::AyuCosmetics::FormatNanoTon(
 +							::AyuCosmetics::ParseNanoTon(value)));
 +					::AyuCosmetics::RefreshBalances();
++				}));
++		},
++	});
++	const auto freeLabel = [](bool value) {
++		return value ? u"Вкл."_q : u"Выкл."_q;
++	};
++	const auto free = std::make_shared<rpl::variable<bool>>(
++		::AyuCosmetics::FreeLocalPurchases());
++	builder.addButton({
++		.id = u"ayu/localFreePurchases"_q,
++		.title = rpl::single(u"Не тратить звёзды на AyuNFT"_q),
++		.icon = { &st::menuIconStar },
++		.label = free->value() | rpl::map(freeLabel),
++		.onClick = [=] {
++			*free = !free->current();
++			::AyuCosmetics::SetFreeLocalPurchases(free->current());
++		},
++	});
++	const auto phone = std::make_shared<rpl::variable<QString>>(
++		::AyuCosmetics::LocalPhone());
++	builder.addButton({
++		.id = u"ayu/localPhone"_q,
++		.title = rpl::single(u"Номер в профиле"_q),
++		.icon = { &st::menuIconProfile },
++		.label = phone->value(),
++		.onClick = [=] {
++			controller->show(Box<EditMarkBox>(
++				rpl::single(u"Номер, например +888 0000 0000"_q),
++				phone->current(),
++				QString(),
++				[=](const QString &value) {
++					auto clean = value;
++					clean.remove(QRegularExpression(u"[^0-9]"_q));
++					*phone = clean;
++					::AyuCosmetics::SetLocalPhone(clean);
++					const auto session = &controller->session();
++					session->changes().peerUpdated(
++						session->user(),
++						Data::PeerUpdate::Flag::PhoneNumber);
 +				}));
 +		},
 +	});
@@ -2422,6 +2658,39 @@ diff --git a/Telegram/SourceFiles/ayu/utils/telegram_helpers.cpp b/Telegram/Sour
  
  	const auto botId = isSupporter ? regDateBotId : regDateBotFallbackId;
  	const auto botUsername = isSupporter ? regDateBotUsername : regDateBotFallbackUsername;
+diff --git a/Telegram/SourceFiles/boxes/star_gift_box.cpp b/Telegram/SourceFiles/boxes/star_gift_box.cpp
+--- a/Telegram/SourceFiles/boxes/star_gift_box.cpp
++++ b/Telegram/SourceFiles/boxes/star_gift_box.cpp
+@@ -130,6 +130,9 @@
+ #include "styles/style_menu_icons.h"
+ #include "styles/style_premium.h"
+ #include "styles/style_settings.h"
++#include "styles/style_menu_icons.h"
++#include "ayu/ui/boxes/local_nft_box.h"
++#include "settings/settings_common.h"
+ #include "styles/style_widgets.h"
+ 
+ #include <QtWidgets/QApplication>
+@@ -1791,6 +1794,19 @@
+ 	AddSkip(content);
+ 	AddSkip(box->verticalLayout());
+ 
++	if (peer->isUser()) {
++		// AyuGram: a separate entry, it never reaches the real payment flow.
++		Settings::AddButtonWithIcon(
++			content,
++			rpl::single(u"AyuNFT — визуальные подарки"_q),
++			st::settingsButton,
++			{ &st::menuIconGiftPremium }
++		)->setClickedCallback([=] {
++			AyuCosmetics::ShowBuyLocalGift(window, peer);
++		});
++		AddSkip(content);
++	}
++
+ 	const auto starsClickHandlerFilter = [=](const auto &...) {
+ 		window->showSettings(Settings::CreditsId());
+ 		return false;
 diff --git a/Telegram/SourceFiles/boxes/gift_premium_box.cpp b/Telegram/SourceFiles/boxes/gift_premium_box.cpp
 --- a/Telegram/SourceFiles/boxes/gift_premium_box.cpp
 +++ b/Telegram/SourceFiles/boxes/gift_premium_box.cpp
@@ -2805,7 +3074,20 @@ diff --git a/Telegram/SourceFiles/info/profile/info_profile_values.cpp b/Telegra
  namespace Info {
  namespace Profile {
  namespace {
-@@ -224,6 +228,20 @@
+@@ -131,6 +135,12 @@
+ 			user,
+ 			UpdateFlag::PhoneNumber) | rpl::to_empty
+ 	) | rpl::map([=] {
++		if (user->isSelf()) {
++			const auto local = AyuCosmetics::LocalPhone();
++			if (!local.isEmpty()) {
++				return tr::marked(Ui::FormatPhone(local));
++			}
++		}
+ 		return tr::marked(Ui::FormatPhone(user->phone()));
+ 	});
+ }
+@@ -224,6 +234,20 @@
  		peer->session().changes().peerFlagsValue(peer, UpdateFlag::Usernames)
  	);
  	if (const auto user = peer->asUser()) {
@@ -2826,7 +3108,7 @@ diff --git a/Telegram/SourceFiles/info/profile/info_profile_values.cpp b/Telegra
  		return std::move(value) | rpl::map([=] {
  			return map(user->usernames());
  		});
-@@ -738,6 +756,18 @@
+@@ -738,6 +762,18 @@
  
  rpl::producer<BadgeType> BadgeValue(not_null<PeerData*> peer) {
  	if (const auto user = peer->asUser()) {
