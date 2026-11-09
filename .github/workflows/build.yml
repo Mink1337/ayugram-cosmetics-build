@@ -19,11 +19,21 @@ jobs:
     env:
       UPSTREAM_REF: v7.2.9
       REPO_NAME: AyuGramDesktop
+      # WHY: writing the debug database ran the linker out of memory.
+      _LINK_: /DEBUG:NONE
     defaults:
       run:
         shell: cmd
 
     steps:
+      - name: Enlarge the page file.
+        continue-on-error: true
+        uses: al-cloudflare/configure-pagefile-action@v1.4
+        with:
+          minimum-size: 16GB
+          maximum-size: 24GB
+          disk-root: "D:"
+
       - name: Prepare directories.
         run: |
           git config --global core.autocrlf false
